@@ -23,5 +23,10 @@ def nut(diameter=18, length=15, tol=0.01):
     return solid
 
 
+@p.add_part
+def bigger_bolt():
+    return bolt(length=40)
+
+
 if __name__ == '__main__':
     p.run()
