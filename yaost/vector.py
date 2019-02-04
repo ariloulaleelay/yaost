@@ -17,7 +17,7 @@ class Vector(object):
     def _com_for_children(cls, children):
         result = Vector()
         for child in children:
-            result += child
+            result += child.com
         if children:
             result /= len(children)
         return result
@@ -44,24 +44,44 @@ class Vector(object):
     @classmethod
     def com_for_translate(cls, children, *args, **kwargs):
         result = cls._com_for_children(children)
+        if kwargs.get('clone'):
+            return (result + result.translate(*args[0])) / 2
         return result.translate(*args[0])
 
     @classmethod
     def com_for_mirror(cls, children, *args, **kwargs):
         result = cls._com_for_children(children)
+        if kwargs.get('clone'):
+            return (result + result.mirror(*args[0])) / 2
         return result.mirror(*args[0])
 
     @classmethod
     def com_for_rotate(cls, children, *args, **kwargs):
         result = cls._com_for_children(children)
+        if kwargs.get('clone'):
+            return (result + result.rotate(*args[0])) / 2
         return result.rotate(*args[0])
+
+    @classmethod
+    def com_for_scale(cls, children, *args, **kwargs):
+        result = cls._com_for_children(children)
+        if kwargs.get('clone'):
+            return (result + result.scale(*args[0])) / 2
+        return result.scale(*args[0])
 
     @classmethod
     def com_for_union(cls, children, *args, **kwargs):
         return cls._com_for_children(children)
 
+    @classmethod
+    def com_for_hull(cls, children, *args, **kwargs):
+        return cls._com_for_children(children)
+
     def translate(self, x, y, z):
         return Vector(self.x + x, self.y + y, self.z + z)
+
+    def scale(self, x, y, z):
+        return Vector(self.x * x, self.y * y, self.z * z)
 
     def mirror(self, x, y, z):
         return Vector(

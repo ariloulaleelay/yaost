@@ -24,8 +24,8 @@ class Node(object):
             children = [children]
         self._name = name
         self._children = children
-        self._args = args
-        self._kwargs = kwargs
+        self.args = copy.deepcopy(args)
+        self.kwargs = copy.deepcopy(kwargs)
         self.os = DialectProxy(self)
 
     def __argument_to_string(self, arg):
@@ -52,10 +52,10 @@ class Node(object):
         return k
 
     def to_string(self):
-        args = [self.__argument_to_string(v) for v in self._args]
+        args = [self.__argument_to_string(v) for v in self.args]
         kwargs = [
             '{}={}'.format(self.__magic_keys(k), self.__argument_to_string(v))
-            for k, v in self._kwargs.items()
+            for k, v in self.kwargs.items()
         ]
 
         children = ''.join(c.to_string() for c in self._children)
@@ -80,18 +80,17 @@ class Node(object):
 
     @lazy
     def com(self):
-        if hasattr(Vector, 'com_for_{}'.format(self._name)):
-            return getattr(Vector, 'com_for_{}'.format(self._name))(
-                self._children, *self._args, **self._kwargs
-            )
+        attr = 'com_for_{}'.format(self._name)
+        if hasattr(Vector, attr):
+            print("COM: {}".format(self._name))
+            return getattr(Vector, attr)(self._children, *self.args, **self.kwargs)
         return Vector(0., 0., 0.)
 
     @lazy
     def size(self):
-        if hasattr(Vector, 'size_for_{}'.format(self._name)):
-            return getattr(Vector, 'size_for_{}'.format(self._name))(
-                self._children, *self._args, **self._kwargs
-            )
+        attr = 'size_for_{}'.format(self._name)
+        if hasattr(Vector, attr):
+            return getattr(Vector, attr)(self._children, *self.args, **self.kwargs)
         return Vector(0., 0., 0.)
 
     def t(self, x=0, y=0, z=0, **kwargs):
@@ -189,10 +188,10 @@ class Node(object):
     def __sub__(self, other):
         return self.difference(other)
 
-    def __getattr__(self, key):
-        if 'child' in self.__dict__:
-            return getattr(self.child, key)
-        raise AttributeError(key)
+    # def __getattr__(self, key):
+    #     if 'child' in self.__dict__:
+    #         return getattr(self.child, key)
+    #     raise AttributeError(key)
 
 
 class TransformationNode(Node):
@@ -201,16 +200,16 @@ class TransformationNode(Node):
         return self.__class__(
             self._name,
             [c._apply_same_transformations_to(other_object) for c in self._children],
-            *self._args,
-            **self._kwargs,
+            *self.args,
+            **self.kwargs,
         )
 
     def to_string(self):
-        if not self._kwargs.get('clone', False):
+        if not self.kwargs.get('clone', False):
             return super(TransformationNode, self).to_string()
-        kwargs = copy.copy(self._kwargs)
+        kwargs = copy.copy(self.kwargs)
         kwargs.pop('clone')
-        clone = self.__class__(self._name, self._children, *self._args, **kwargs)
+        clone = self.__class__(self._name, self._children, *self.args, **kwargs)
         union = DisitributiveNode('union', self._children + [clone])
         return union.to_string()
 
