@@ -48,7 +48,7 @@ $ python example.py watch
 ```
 The open file with
 ```
-$ openscad scad/simple-cube.stl
+$ openscad scad/simple-cube.scad
 ```
 Chane something in example.py (eg. ```cube(30, 10, 10)```) you should see changes in openscad viewe immediately.
 
