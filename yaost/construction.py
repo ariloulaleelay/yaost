@@ -2,19 +2,18 @@
 from math import pi, tan, cos, sin
 from .local_logging import get_logger
 from .scad import cylinder, polyhedron
-from .config import Config
 
 logger = get_logger(__name__)
 
-nuts = Config()
-
-nuts.m4.set(
-    height=3.2,
-    width=7.,
-    diameter=8.,
-    internal_diameter=3.95,
-    screw_diameter=4.1,
-)
+# nuts = lambda: None  # noqa
+#
+# nuts.m4.set(
+#     height=3.2,
+#     width=7.,
+#     diameter=8.,
+#     internal_diameter=3.95,
+#     screw_diameter=4.1,
+# )
 
 
 def deg2rad(deg):
