@@ -1,0 +1,2 @@
+lazy>=1.4
+pyinotify>=0.9.6

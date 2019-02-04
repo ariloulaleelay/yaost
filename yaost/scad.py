@@ -1,0 +1,101 @@
+from math import cos, sin, pi
+from .base import Node, DisitributiveNode
+
+
+def union(*args):
+    return DisitributiveNode('union', args)
+
+
+def hull(*args):
+    return DisitributiveNode('hull', args)
+
+
+def intersection(*args):
+    return DisitributiveNode('intersection', args)
+
+
+def difference(x, y):
+    return Node('difference', [x, y])
+
+
+def cube(x=0, y=0, z=0):
+    return Node('cube', None, [x, y, z])
+
+
+def cylinder(d=None, h=0, **kwargs):
+    kwargs['h'] = h
+    if d is not None:
+        kwargs['d'] = d
+
+    if kwargs.get('fn', None) is None:
+        dd = max([kwargs.get(k, 0) for k in ('d', 'd1', 'd2', 'r')])
+        if dd < 10:
+            kwargs['fn'] = 32
+        elif dd < 30:
+            kwargs['fn'] = 64
+        else:
+            kwargs['fn'] = 128
+    return Node('cylinder', None, **kwargs)
+
+
+def sphere(d=None, r=None, fn=32):
+    if r is not None:
+        d = r * 2
+    return Node('sphere', None, d=d, fn=fn)
+
+
+def polygon(points, path=None, **kwargs):
+    if path is None:
+        path = list(range(len(points)))
+    return Node('polygon', None, points, path, **kwargs)
+
+
+def polyhedron(points, faces=None, **kwargs):
+    if faces is not None:
+        kwargs['faces'] = faces
+    return Node('polyhedron', None, points, **kwargs)
+
+
+def sector(d=None, d1=None, d2=None, h=None, a=None, fn=None):
+    if d is not None:
+        d1 = d2 = d
+    if fn is None:
+        fn = 64
+    assert(d1 is not None and d2 is not None and h is not None and a is not None)
+    assert(d1 > 0 and d2 > 0 and h > 0 and a > 0 and fn > 0)
+    bottom_points = [[0, 0, 0]]
+    top_points = [[0, 0, h]]
+    for i in range(fn + 1):
+        angle = float(i) * a / fn
+        angle_rad = angle * pi / 180
+        x = d1 / 2 * cos(angle_rad)
+        y = d1 / 2 * sin(angle_rad)
+        bottom_points.append([x, y, 0])
+
+        x = d2 / 2 * cos(angle_rad)
+        y = d2 / 2 * sin(angle_rad)
+        top_points.append([x, y, h])
+
+    faces = []
+    points = bottom_points + top_points
+    top_start = len(bottom_points)
+    for i in range(fn):
+        bottom_idx = 1 + i
+        top_idx = top_start + 1 + i
+        faces.append([top_start, top_idx, top_idx + 1])
+        faces.append([0, bottom_idx + 1, bottom_idx])
+
+        faces.append([bottom_idx, bottom_idx + 1, top_idx + 1])
+        faces.append([top_idx + 1, top_idx, bottom_idx])
+
+    faces.append([0, 1, top_start + 1, top_start])
+    faces.append([0, top_start, top_start + fn + 1, fn + 1])
+    return polyhedron(points, [reversed(f) for f in faces], convexity=2)
+
+
+def stl_model(filename, convexity=10):
+    return Node('import', None, filename, convexity=convexity)
+
+
+def text_model(txt, size=10, halign='left', valign='baseline', **kwargs):
+    return Node('text', None, txt, size=size, halign=halign, valign=valign, **kwargs)
