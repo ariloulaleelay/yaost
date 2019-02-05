@@ -50,4 +50,3 @@ class ModuleWatcher(pyinotify.ProcessEvent):
             return
         if self._callback is not None:
             getattr(self, '_callback')(event.pathname)
-        # print('Reload', event.pathname)

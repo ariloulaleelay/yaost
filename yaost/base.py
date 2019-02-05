@@ -82,7 +82,6 @@ class Node(object):
     def com(self):
         attr = 'com_for_{}'.format(self._name)
         if hasattr(Vector, attr):
-            print("COM: {}".format(self._name))
             return getattr(Vector, attr)(self._children, *self.args, **self.kwargs)
         return Vector(0., 0., 0.)
 
