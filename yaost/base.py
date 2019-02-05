@@ -193,10 +193,10 @@ class Node(object):
     def __sub__(self, other):
         return self.difference(other)
 
-    # def __getattr__(self, key):
-    #     if 'child' in self.__dict__:
-    #         return getattr(self.child, key)
-    #     raise AttributeError(key)
+    def __getattr__(self, key):
+        if len(self._children) != 1:
+            raise AttributeError(key)
+        return getattr(self._children[0], key)
 
 
 class TransformationNode(Node):
