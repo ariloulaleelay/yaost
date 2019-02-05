@@ -47,8 +47,8 @@ class Node(object):
         raise Exception('Unknown argument type {} ({})'.format(type(arg), arg))
 
     def __magic_keys(self, k):
-        if k == 'fn':
-            return '$fn'
+        if k in {'fa', 'fs', 'fn'}:
+            return '$' + k
         return k
 
     def to_string(self):
@@ -130,8 +130,14 @@ class Node(object):
             result = TransformationNode('mirror', result, [x, y, z], **kwargs)
         return result
 
-    def extrude(self, height, **kwargs):
-        return TransformationNode('extrude', self, height, **kwargs)
+    def extrude(self, *args, **kwargs):
+        return self.linear_extrude(*args, **kwargs)
+
+    def linear_extrude(self, *args, **kwargs):
+        return TransformationNode('linear_extrude', self, *args, **kwargs)
+
+    def rotate_extrude(self, *args, **kwargs):
+        return TransformationNode('rotate_extrude', self, *args, **kwargs)
 
     def tx(self, x, **kwargs):
         return self.t(x=x, **kwargs)

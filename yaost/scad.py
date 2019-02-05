@@ -22,32 +22,16 @@ def cube(x=0, y=0, z=0):
     return Node('cube', None, [x, y, z])
 
 
-def cylinder(d=None, h=0, **kwargs):
-    kwargs['h'] = h
-    if d is not None:
-        kwargs['d'] = d
-
-    if kwargs.get('fn', None) is None:
-        dd = max([kwargs.get(k, 0) for k in ('d', 'd1', 'd2', 'r')])
-        if dd < 10:
-            kwargs['fn'] = 32
-        elif dd < 30:
-            kwargs['fn'] = 64
-        else:
-            kwargs['fn'] = 128
-    return Node('cylinder', None, **kwargs)
+def cylinder(*args, **kwargs):
+    return Node('cylinder', None, *args, **kwargs)
 
 
-def sphere(d=None, r=None, fn=32):
-    if r is not None:
-        d = r * 2
-    return Node('sphere', None, d=d, fn=fn)
+def sphere(*args, **kwargs):
+    return Node('sphere', None, *args, **kwargs)
 
 
-def polygon(points, path=None, **kwargs):
-    if path is None:
-        path = list(range(len(points)))
-    return Node('polygon', None, points, path, **kwargs)
+def polygon(*args, **kwargs):
+    return Node('polygon', None, *args, **kwargs)
 
 
 def polyhedron(points, faces=None, **kwargs):
