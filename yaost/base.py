@@ -83,7 +83,7 @@ class Node(object):
         attr = 'com_for_{}'.format(self._name)
         if hasattr(Vector, attr):
             return getattr(Vector, attr)(self._children, *self.args, **self.kwargs)
-        return Vector(0., 0., 0.)
+        return Vector.com_for_children(self._children)
 
     @lazy
     def size(self):
