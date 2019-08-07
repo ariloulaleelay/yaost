@@ -19,7 +19,11 @@ def difference(x, y):
 
 
 def cube(x=0, y=0, z=0):
-    return Node('cube', None, [x, y, z])
+    result = Node('cube', None, [x, y, z])
+    result.x = x
+    result.y = y
+    result.z = z
+    return result
 
 
 def cylinder(*args, **kwargs):

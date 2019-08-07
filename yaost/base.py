@@ -194,8 +194,12 @@ class Node(object):
         return self.difference(other)
 
     def __getattr__(self, key):
+        if len(self._children) == 0 and key in self.kwargs:
+            return self.kwargs[key]
+
         if len(self._children) != 1:
             raise AttributeError(key)
+
         return getattr(self._children[0], key)
 
 
