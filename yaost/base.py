@@ -32,14 +32,14 @@ class Node(object):
         if isinstance(arg, str):
             return '"{}"'.format(arg)
 
+        if isinstance(arg, bool):
+            return str(arg).lower()
+
         if isinstance(arg, int):
             return '{}'.format(arg)
 
         if isinstance(arg, float):
             return '{:.6f}'.format(arg)
-
-        if isinstance(arg, bool):
-            return str(arg).lower()
 
         if isinstance(arg, list) or hasattr(arg, '__iter__'):
             return '[{}]'.format(','.join(self.__argument_to_string(v) for v in arg))
