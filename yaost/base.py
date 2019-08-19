@@ -178,8 +178,8 @@ class Node(object):
     def hull(self, *other):
         return DisitributiveNode('hull', [self] + list(other))
 
-    def offset(self, r, chamfer=True):
-        return Node('offset', [self], r, chamfer=chamfer)
+    def offset(self, *args, **kwargs):
+        return Node('offset', [self], *args, **kwargs)
 
     def _apply_same_transformations_to(self, other_object):
         return other_object
