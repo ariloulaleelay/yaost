@@ -90,6 +90,15 @@ class Vector(object):
             self.z * (-1 if z else 1),
         )
 
+    def mx(self):
+        return self.mirror(1, 0, 0)
+
+    def my(self):
+        return self.mirror(0, 1, 0)
+
+    def mz(self):
+        return self.mirror(0, 0, 1)
+
     def rotate(self, ax=0, ay=0, az=0):
         a_sin = sin(ax * pi / 180)
         a_cos = cos(ax * pi / 180)
@@ -110,6 +119,15 @@ class Vector(object):
         z3 = z2
         return Vector(x3, y3, z3)
 
+    def rx(self, ax):
+        return self.rotate(ax=ax)
+
+    def ry(self, ay):
+        return self.rotate(ay=ay)
+
+    def rz(self, az):
+        return self.rotate(az=az)
+
     @lazy
     def norm(self):
         return sqrt(self.x**2 + self.y**2 + self.z**2)
@@ -124,11 +142,21 @@ class Vector(object):
     def as_array(self):
         return [self.x, self.y, self.z]
 
+    @lazy
+    def as_array_2d(self):
+        return [self.x, self.y]
+
     def t(self, x=0, y=0, z=0):
         return self.translate(x, y, z)
 
-    def rz(self, a):
-        return self.rotate(ax=0, ay=0, az=a)
+    def tx(self, x):
+        return self.translate(x, 0, 0)
+
+    def ty(self, y):
+        return self.translate(0, y, 0)
+
+    def tz(self, z):
+        return self.translate(0, 0, z)
 
     def dot(a, b):
         return a.x * b.x + a.y * b.y + a.z * b.z
