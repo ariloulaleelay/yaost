@@ -30,6 +30,9 @@ class Node(object):
 
     def __argument_to_string(self, arg):
         if isinstance(arg, str):
+            # TODO fix this crutch
+            if arg == '$preview':
+                return arg
             return '"{}"'.format(arg)
 
         if isinstance(arg, bool):
@@ -71,6 +74,12 @@ class Node(object):
             children,
             tail,
         )
+
+    def preview(self):
+        return Node('if', [self], '$preview')
+
+    def color(self, *args, **kwargs):
+        return Node('color', [self], *args, **kwargs)
 
     def _assert_numeric(self, *args):
         for arg in args:
