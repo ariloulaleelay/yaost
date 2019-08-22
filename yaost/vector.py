@@ -1,6 +1,6 @@
 # coding: utf-8
 from lazy import lazy
-from math import sin, cos, pi, sqrt
+from math import sin, cos, pi, sqrt, atan2
 
 
 class Vector(object):
@@ -139,12 +139,20 @@ class Vector(object):
         return Vector(self.x / self.norm, self.y / self.norm, self.z / self.norm)
 
     @lazy
+    def normal(self):
+        return Vector(-self.y, self.x, self.z)
+
+    @lazy
     def as_array(self):
         return [self.x, self.y, self.z]
 
     @lazy
     def as_array_2d(self):
         return [self.x, self.y]
+
+    @lazy
+    def alpha(self):
+        return atan2(self.x, self.y)
 
     def t(self, x=0, y=0, z=0):
         return self.translate(x, y, z)
@@ -167,6 +175,20 @@ class Vector(object):
             a.z * b.x - a.x * b.z,
             a.x * b.y - a.y * b.x,
         )
+
+    def projection(self, pl, pr):
+        v1 = pr - pl
+        v2 = self - pl
+
+        if v2.norm == 0:
+            return self
+
+        new_length = v1.dot(v2) / v1.norm
+        result = Vector(
+            pl.x + new_length * v1.x / v1.norm,
+            pl.y + new_length * v1.y / v1.norm
+        )
+        return result
 
     def __sub__(a, b):
         return Vector(a.x - b.x, a.y - b.y, a.z - b.z)

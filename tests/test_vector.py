@@ -15,3 +15,17 @@ def test_translate():
 
     vt = v.t(1, 2, 3)
     assert (1, 2, 3) == (vt.x, vt.y, vt.z)
+
+
+def test_projection():
+    for i in range(360):
+        v = Vector(0, 0)
+        pl = Vector(10, -10).rz(i * 0.1)
+        pr = Vector(10, 10).rz(i * 0.1)
+
+        for l, r in ((pl, pr), (pr, pl)):
+            projection = v.projection(l, r)
+
+            assert (l - projection).norm <= (l - v).norm
+            assert (r - projection).norm <= (r - v).norm
+            assert abs((v - projection).dot(l - r)) < 10e-6
