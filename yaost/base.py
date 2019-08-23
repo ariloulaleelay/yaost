@@ -81,6 +81,18 @@ class Node(object):
     def color(self, *args, **kwargs):
         return Node('color', [self], *args, **kwargs)
 
+    def debug(self, *args, **kwargs):
+        return NoArgumentsNode('#', [self])
+
+    def root(self, *args, **kwargs):
+        return NoArgumentsNode('!', [self])
+
+    def disable(self, *args, **kwargs):
+        return NoArgumentsNode('*', [self])
+
+    def background(self, *args, **kwargs):
+        return NoArgumentsNode('%', [self])
+
     def _assert_numeric(self, *args):
         for arg in args:
             if isinstance(arg, (float, int)):
@@ -210,6 +222,19 @@ class Node(object):
             raise AttributeError(key)
 
         return getattr(self._children[0], key)
+
+
+class NoArgumentsNode(Node):
+
+    def to_string(self):
+        children = ''.join(c.to_string() for c in self._children)
+        tail = ';'
+
+        if children:
+            tail = ''
+            if len(self._children) > 1:
+                children = '{' + children + '}'
+        return '{}{}{}'.format(self._name, children, tail)
 
 
 class TransformationNode(Node):
