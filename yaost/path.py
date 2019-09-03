@@ -58,7 +58,6 @@ class Path(object):
         # TODO evaluate fn wisely
         result = []
         for p, c, n in self._triples():
-            print(p, c, n)
             is_convex = point_orientation(p, c, n)
 
             if is_convex == (r < 0):
