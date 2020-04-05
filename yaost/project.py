@@ -17,9 +17,10 @@ logger = get_logger(__name__)
 class Project(object):
     _single_run_guard = False
 
-    def __init__(self, name='Untitled', fa=3.0, fs=0.5):
+    def __init__(self, name='Untitled', fa=3.0, fs=0.5, fn=0):
         self._fa = fa
         self._fs = fs
+        self._fn = fn
         self.name = name
         self.parts = {}
 
@@ -76,7 +77,7 @@ class Project(object):
             logger.info('building %s.scad', name)
             file_path = os.path.join(args.scad_directory, name + '.scad')
             with open(file_path, 'w') as fp:
-                fp.write('$fa={:.4f};\n$fs={:.4f};\n'.format(self._fa, self._fs))
+                fp.write('$fa={:.4f};\n$fs={:.4f};\n$fn={:.4f};\n'.format(self._fa, self._fs, self._fn))
                 fp.write(model.to_string())
 
     def watch(self, args):
