@@ -54,11 +54,13 @@ class Path(object):
         for i in range(total):
             yield points[i], points[(i + 1) % total], points[(i + 2) % total]
 
-    def offset(self, r=0, fn=16):
+    def offset(self, r=0, fn=16, use_z=False):
         # TODO evaluate fn wisely
         result = []
         for p, c, n in self._triples():
             is_convex = point_orientation(p, c, n)
+            if use_z:
+                r = c.z
 
             if is_convex == (r < 0):
                 b = ((p - c).normed + (n - c).normed).normed

@@ -1,17 +1,17 @@
 from math import cos, sin, pi
-from .base import Node, DisitributiveNode
+from .base import Node, DistributiveNode
 
 
 def union(*args):
-    return DisitributiveNode('union', args)
+    return DistributiveNode('union', args)
 
 
 def hull(*args):
-    return DisitributiveNode('hull', args)
+    return DistributiveNode('hull', args)
 
 
 def intersection(*args):
-    return DisitributiveNode('intersection', args)
+    return DistributiveNode('intersection', args)
 
 
 def difference(x, y):
@@ -42,6 +42,14 @@ def polyhedron(points, faces=None, **kwargs):
     if faces is not None:
         kwargs['faces'] = faces
     return Node('polyhedron', None, points, **kwargs)
+
+
+def circle(*args, **kwargs):
+    return Node('circle', None, *args, **kwargs)
+
+
+def square(*args, **kwargs):
+    return Node('square', None, *args, **kwargs)
 
 
 def sector(d=None, d1=None, d2=None, h=None, a=None, fn=None):

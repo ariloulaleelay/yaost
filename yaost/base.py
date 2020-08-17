@@ -59,6 +59,7 @@ class Node(object):
         kwargs = [
             '{}={}'.format(self.__magic_keys(k), self.__argument_to_string(v))
             for k, v in self.kwargs.items()
+            if not k.startswith('_')
         ]
 
         children = ''.join(c.to_string() for c in self._children)
@@ -98,6 +99,17 @@ class Node(object):
             if isinstance(arg, (float, int)):
                 continue
             raise Exception("%s neither float nor int" % (arg))
+
+    @lazy
+    def is_2d(self):
+        return self._name in {
+            'projection',
+            'offset',
+            'text',
+            'polyton',
+            'square',
+            'circle'
+        }
 
     @lazy
     def com(self):
@@ -191,16 +203,19 @@ class Node(object):
         return Node('difference', [self, other])
 
     def union(self, *other):
-        return DisitributiveNode('union', [self] + list(other))
+        return DistributiveNode('union', [self] + list(other))
 
     def intersection(self, *other):
-        return DisitributiveNode('intersection', [self] + list(other))
+        return DistributiveNode('intersection', [self] + list(other))
 
     def hull(self, *other):
-        return DisitributiveNode('hull', [self] + list(other))
+        return DistributiveNode('hull', [self] + list(other))
 
     def offset(self, *args, **kwargs):
         return Node('offset', [self], *args, **kwargs)
+
+    def projection(self, *args, **kwargs):
+        return Node('projection', [self], *args, **kwargs)
 
     def _apply_same_transformations_to(self, other_object):
         return other_object
@@ -247,17 +262,23 @@ class TransformationNode(Node):
             **self.kwargs,
         )
 
+    @lazy
+    def is_2d(self):
+        if self._name in {'linear_extrude', 'rotate_extrude'}:
+            return False
+        return all(child.is_2d for child in self._children)
+
     def to_string(self):
         if not self.kwargs.get('clone', False):
             return super(TransformationNode, self).to_string()
         kwargs = copy.copy(self.kwargs)
         kwargs.pop('clone')
         clone = self.__class__(self._name, self._children, *self.args, **kwargs)
-        union = DisitributiveNode('union', self._children + [clone])
+        union = DistributiveNode('union', self._children + [clone])
         return union.to_string()
 
 
-class DisitributiveNode(Node):
+class DistributiveNode(Node):
 
     def __init__(self, name, children, *args, **kwargs):
         flat_children = []
@@ -267,4 +288,4 @@ class DisitributiveNode(Node):
                     flat_children.append(grandchild)
             else:
                 flat_children.append(child)
-        super(DisitributiveNode, self).__init__(name, flat_children, *args, **kwargs)
+        super(DistributiveNode, self).__init__(name, flat_children, *args, **kwargs)

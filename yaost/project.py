@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 class Project(object):
     _single_run_guard = False
 
-    def __init__(self, name='Untitled', fa=3.0, fs=0.5, fn=0):
+    def __init__(self, name='Untitled', fa=3.0, fs=0.5, fn=None):
         self._fa = fa
         self._fs = fs
         self._fn = fn
@@ -34,38 +34,50 @@ class Project(object):
             self.parts[name_or_method] = model
         except:  # noqa
             logger.exception("failed to add model")
-            pass
         return method
 
     def get_part(self, name):
         return self.parts[name]
 
     def build_stl(self, args):
+        self.build(args, stl_only=True)
+
+    def build(self, args, stl_only=False):
         self.build_scad(args)
         cache = self._read_cache(args.cache_file)
         if 'scad_cache' not in cache:
             cache['scad_cache'] = {}
 
-        if not os.path.exists(args.stl_directory):
-            os.makedirs(args.stl_directory)
+        if not os.path.exists(args.build_directory):
+            os.makedirs(args.build_directory)
 
-        for name, _ in self.parts.items():
-            logger.info('building %s.stl', name)
+        for name, model in self.parts.items():
             scad_file_path = os.path.join(args.scad_directory, name + '.scad')
-            stl_file_path = os.path.join(args.stl_directory, name + '.stl')
 
-            if os.path.exists(stl_file_path) and not args.force:
-                hc = self._get_files_hash(scad_file_path, stl_file_path)
+            extension = '.stl'
+            if model.is_2d:
+                extension = '.dxf'
+                if stl_only:
+                    continue
+            logger.info('building %s%s', name, extension)
+            target_directory = args.build_directory
+            if stl_only:
+                target_directory = args.stl_directory
+
+            result_file_path = os.path.join(target_directory, name + extension)
+
+            if os.path.exists(result_file_path) and not args.force:
+                hc = self._get_files_hash(scad_file_path, result_file_path)
                 if cache['scad_cache'].get(scad_file_path, '') == hc:
                     continue
 
             command_args = [
                 'openscad',
                 scad_file_path,
-                '-o', stl_file_path,
+                '-o', result_file_path,
             ]
             subprocess.call(command_args, shell=False)
-            hc = self._get_files_hash(scad_file_path, stl_file_path)
+            hc = self._get_files_hash(scad_file_path, result_file_path)
             cache['scad_cache'][scad_file_path] = hc
         self._write_cache(args.cache_file, cache)
 
@@ -77,7 +89,10 @@ class Project(object):
             logger.info('building %s.scad', name)
             file_path = os.path.join(args.scad_directory, name + '.scad')
             with open(file_path, 'w') as fp:
-                fp.write('$fa={:.4f};\n$fs={:.4f};\n$fn={:.4f};\n'.format(self._fa, self._fs, self._fn))
+                for key in ('fa', 'fs', 'fn'):
+                    value = getattr(self, '_{}'.format(key), None)
+                    if value is not None:
+                        fp.write('${}={:.4f};\n'.format(key, value))
                 fp.write(model.to_string())
 
     def watch(self, args):
@@ -149,7 +164,7 @@ class Project(object):
             return h.hexdigest()
         except Exception as e:  # noqa
             logger.error("hashing gone wrong %s %s", filename, e)
-            return uuid.uuid4()
+            return str(uuid.uuid4())
 
     def run(self):
         if Project._single_run_guard:
@@ -159,6 +174,7 @@ class Project(object):
         parser = argparse.ArgumentParser(sys.argv[0])
         parser.add_argument('--scad-directory', type=str, help='directory to store .scad files', default='scad')
         parser.add_argument('--stl-directory', type=str, help='directory to store .stl files', default='stl')
+        parser.add_argument('--build-directory', type=str, help='directory to store result files', default='build')
         parser.add_argument('--cache-file', type=str, help='file to store some cahces', default='.yaost.cache')
         parser.add_argument('--force', action='store_true', help='force action', default=False)
         parser.add_argument('--debug', action='store_true', help='enable debug output', default=False)
@@ -173,6 +189,9 @@ class Project(object):
 
         build_stl_parser = subparsers.add_parser('build-stl', help='build scad and stl files')
         build_stl_parser.set_defaults(func=self.build_stl)
+
+        build_parser = subparsers.add_parser('build', help='build all files')
+        build_parser.set_defaults(func=self.build)
 
         args = parser.parse_args()
 
