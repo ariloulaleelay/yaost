@@ -31,6 +31,8 @@ class Project(object):
                 method = name_or_method
                 name_or_method = name_or_method.__name__.lower().replace('_', '-')
                 model = method()
+                if not model.kwargs.get('_module_name'):
+                    model = model.module_name(method.__name__)
             self.parts[name_or_method] = model
         except:  # noqa
             logger.exception("failed to add model")
@@ -93,7 +95,22 @@ class Project(object):
                     value = getattr(self, '_{}'.format(key), None)
                     if value is not None:
                         fp.write('${}={:.4f};\n'.format(key, value))
-                fp.write(model.to_string())
+                cache = {}
+                node_index = 0
+                for node in model.traverse_children_deep_first():
+                    node_string = node.to_string(cache=cache)
+                    if node.depth > 1 and node.id not in cache:
+                        node_index += 1
+                        module_name = node.kwargs.get('_module_name', '')
+                        if module_name:
+                            module_name = 'n{}_{}'.format(node_index, module_name)
+                        else:
+                            module_name = 'n{}'.format(node_index)
+                        fp.write('module {}(){{{}}} // {}\n'.format(
+                            module_name, node_string, node.id
+                        ))
+                        cache[node.id] = '{}();'.format(module_name)
+                fp.write(model.to_string(cache=cache))
 
     def watch(self, args):
         try:

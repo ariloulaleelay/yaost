@@ -25,8 +25,16 @@ def base_plate_with_holes():
     holes = holes.mx(plate.com.x, clone=True)  # mirror holes along x with center in plate.com
     holes = holes.my(plate.com.y, clone=True)
 
-    # all transformations above can be written in short form:
-    # holes = scad.cylinder(d=hole_diameter, h=inf).t(..., ..., 'c').mx(...).my(...)
+    # all transformations above can be written as single chain:
+    # holes = scad.cylinder(
+    #   d=hole_diameter, h=inf
+    # ).t(
+    #   hole_position, hole_position, 'c'
+    # ).mx(
+    #   plate.com.x, clone=True
+    # ).my(
+    #   plate.com.y, clone=True
+    # )
 
     result = plate - holes
     # or result = plate.difference(holes)

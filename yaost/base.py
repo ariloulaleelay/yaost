@@ -1,7 +1,11 @@
 # coding: utf-8
 import copy
+import hashlib
+import logging
 from lazy import lazy
 from .vector import Vector
+
+logger = logging.getLogger(__name__)
 
 
 class DialectProxy(object):
@@ -27,6 +31,7 @@ class Node(object):
         self.args = copy.deepcopy(args)
         self.kwargs = copy.deepcopy(kwargs)
         self.os = DialectProxy(self)
+        self.kwargs.pop('clone', None)
 
     def __argument_to_string(self, arg):
         if isinstance(arg, str):
@@ -54,27 +59,41 @@ class Node(object):
             return '$' + k
         return k
 
-    def to_string(self):
+    def traverse_children_deep_first(self):
+        depths = []
+        for c in self._children:
+            depths.append((c.depth, c))
+        for _, child in sorted(depths, key=lambda x: -x[0]):
+            for descendant in child.traverse_children_deep_first():
+                yield descendant
+        yield self
+
+    def to_string(self, cache=None):
+        if cache is not None and self.id in cache:
+            return cache[self.id]
         args = [self.__argument_to_string(v) for v in self.args]
         kwargs = [
             '{}={}'.format(self.__magic_keys(k), self.__argument_to_string(v))
-            for k, v in self.kwargs.items()
+            for k, v in sorted(self.kwargs.items())
             if not k.startswith('_')
         ]
 
-        children = ''.join(c.to_string() for c in self._children)
+        children = ''.join(c.to_string(cache=cache) for c in self._children)
         tail = ';'
         if children:
             tail = ''
             if len(self._children) > 1:
                 children = '{' + children + '}'
 
-        return '{}({}){}{}'.format(
-            self._name,
-            ','.join(args + kwargs),
-            children,
-            tail,
-        )
+        if self._name in {'#', '*', '!', '%'}:
+            return '{}{}{}'.format(self._name, children, tail)
+
+        return '{}({}){}{}'.format(self._name, ','.join(args + kwargs), children, tail)
+
+    def module_name(self, name):
+        kwargs = copy.deepcopy(self.kwargs)
+        kwargs['_module_name'] = name
+        return Node(self._name, self._children, *self.args, **kwargs)
 
     def preview(self):
         return Node('if', [self], '$preview')
@@ -83,16 +102,19 @@ class Node(object):
         return Node('color', [self], *args, **kwargs)
 
     def debug(self, *args, **kwargs):
-        return NoArgumentsNode('#', [self])
+        return Node('#', [self])
 
     def root(self, *args, **kwargs):
-        return NoArgumentsNode('!', [self])
+        return Node('!', [self])
 
     def disable(self, *args, **kwargs):
-        return NoArgumentsNode('*', [self])
+        return Node('*', [self])
 
     def background(self, *args, **kwargs):
-        return NoArgumentsNode('%', [self])
+        return Node('%', [self])
+
+    def render(self, *args, **kwargs):
+        return Node('render', [self], *args, **kwargs)
 
     def _assert_numeric(self, *args):
         for arg in args:
@@ -110,6 +132,19 @@ class Node(object):
             'square',
             'circle'
         }
+
+    @lazy
+    def id(self):
+        # TODO do hashing a little bit smarter
+        result = hashlib.md5()
+        result.update(self.to_string().encode('utf-8'))
+        return result.hexdigest()
+
+    @lazy
+    def depth(self):
+        if not self._children:
+            return 0
+        return max(c.depth for c in self._children) + 1
 
     @lazy
     def com(self):
@@ -239,20 +274,16 @@ class Node(object):
         return getattr(self._children[0], key)
 
 
-class NoArgumentsNode(Node):
-
-    def to_string(self):
-        children = ''.join(c.to_string() for c in self._children)
-        tail = ';'
-
-        if children:
-            tail = ''
-            if len(self._children) > 1:
-                children = '{' + children + '}'
-        return '{}{}{}'.format(self._name, children, tail)
-
-
 class TransformationNode(Node):
+
+    def __new__(cls, *args, **kwargs):
+        new_kwargs = copy.copy(kwargs)
+        is_clone = new_kwargs.pop('clone', False)
+        if is_clone:
+            clone = cls(*args, **new_kwargs)
+            union = DistributiveNode('union', clone._children + [clone])
+            return union
+        return super(TransformationNode, cls).__new__(cls)
 
     def _apply_same_transformations_to(self, other_object):
         return self.__class__(
@@ -267,15 +298,6 @@ class TransformationNode(Node):
         if self._name in {'linear_extrude', 'rotate_extrude'}:
             return False
         return all(child.is_2d for child in self._children)
-
-    def to_string(self):
-        if not self.kwargs.get('clone', False):
-            return super(TransformationNode, self).to_string()
-        kwargs = copy.copy(self.kwargs)
-        kwargs.pop('clone')
-        clone = self.__class__(self._name, self._children, *self.args, **kwargs)
-        union = DistributiveNode('union', self._children + [clone])
-        return union.to_string()
 
 
 class DistributiveNode(Node):
