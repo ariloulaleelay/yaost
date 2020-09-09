@@ -110,11 +110,11 @@ def _thread(length, pitch, diameter, fn=32, tolerance=0, theta=60):
         faces.append([top_idx, lst_idx - stot * i, lst_idx - stot * (i + 1)])
     faces.append([top_idx, lst_idx - stot * 3, lst_idx - spr])
 
-    faces = [reversed(f) for f in faces]
+    faces = [list(reversed(f)) for f in faces]
     result = polyhedron(
         points=points,
         faces=faces,
-        convexity=revolutions,
+        convexity=revolutions * 3,
     )
 
     result = result.intersection(cylinder(d=(R + abs(tolerance * 2)) * 2, h=length))
