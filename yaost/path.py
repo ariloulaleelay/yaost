@@ -1,9 +1,12 @@
 # coding: utf8
 
+import logging
 from math import acos, pi, sqrt
 
 from .base import Node
 from .vector import Vector
+
+logger = logging.getLogger(__name__)
 
 
 def point_orientation(a, b, c):
@@ -75,7 +78,9 @@ class Path(object):
                 n_prime = c - unit_normal * r
                 n_prime2 = c - unit_normal2 * r
 
-                angle = acos((n_prime - c).normed.dot((n_prime2 - c).normed))
+                cos_phi = (n_prime - c).normed.dot((n_prime2 - c).normed)
+                cos_phi = min(max(cos_phi, -1.0), 1.0)
+                angle = acos(cos_phi)
                 for i in range(fn + 1):
                     alpha = float(i) / fn
                     result.append(
@@ -102,7 +107,9 @@ class Path(object):
 
             is_convex = point_orientation(p, c, n)
 
-            angle = acos(p_normal.normed.dot(n_normal.normed))
+            cos_phi = p_normal.normed.dot(n_normal.normed)
+            cos_phi = min(max(cos_phi, -1.0), 1.0)
+            angle = acos(cos_phi)
             # result.append(center)
             for i in range(fn + 1):
                 alpha = float(i) / fn
