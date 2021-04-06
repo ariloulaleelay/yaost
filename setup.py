@@ -38,7 +38,7 @@ setup_requires = install_requires + []
 
 setup(
     name='yaost',
-    version='0.2.4-dev',
+    version='0.3.0',
     author='Andrey Proskurnev',
     author_email='andrey@proskurnev.ru',
     packages=find_packages(exclude=['tests']),
