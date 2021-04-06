@@ -1,5 +1,6 @@
 from math import cos, sin, pi
 from .base import Node, DistributiveNode
+from .vector import Vector
 
 
 def union(*args):
@@ -7,7 +8,7 @@ def union(*args):
 
 
 def hull(*args):
-    return DistributiveNode('hull', args)
+    return DistributiveNode('hull', args, to_collapse={'hull', 'union'})
 
 
 def intersection(*args):
@@ -34,8 +35,17 @@ def sphere(*args, **kwargs):
     return Node('sphere', None, *args, **kwargs)
 
 
-def polygon(*args, **kwargs):
-    return Node('polygon', None, *args, **kwargs)
+def polygon(points, paths=None, **kwargs):
+    if paths is not None:
+        kwargs['paths'] = paths
+    tmp = []
+    for p in points:
+        if isinstance(p, Vector):
+            tmp.append([p.x, p.y])
+        else:
+            tmp.append(p)
+    points = tmp
+    return Node('polygon', None, points, **kwargs)
 
 
 def polyhedron(points, faces=None, **kwargs):

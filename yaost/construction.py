@@ -31,6 +31,11 @@ def rounded_box(x, y, z, r=5, fn=32):
     return result
 
 
+def get_external_diameter_for_internal(d, pitch, theta=60):
+    H = pitch / (2 * tan(theta / 2 * pi / 180))
+    return d + H * 5 / 8
+
+
 def _thread(length, pitch, diameter, fn=32, tolerance=0, theta=60):
     segments_per_revolution = fn
 
@@ -41,6 +46,11 @@ def _thread(length, pitch, diameter, fn=32, tolerance=0, theta=60):
     D = diameter
     P = pitch
     H = P / (2 * tan(theta / 2 * pi / 180))
+
+    if tolerance == 'external':
+        tolerance = -_pitch_to_tolerance(pitch)
+    elif tolerance == 'internal':
+        tolerance = _pitch_to_tolerance(pitch)
 
     # TODO change radiuses to match right dimension
     r = (D - H * 5 / 8) / 2

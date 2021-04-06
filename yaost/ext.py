@@ -1,4 +1,5 @@
-from yaost import scad
+from yaost import scad, Vector
+from yaost.path import Path
 
 inf = 1000
 tol = 0.005
@@ -117,3 +118,40 @@ class Nema(object):
             -self.height / 2
         ).mx(clone=True).my(clone=True)
         return result.module_name('nema17')
+
+
+class ExtrusionProfile(object):
+
+    def __init__(self, class_='2020'):
+        if class_ == '2020':
+            self.width = 20
+            self.insert_p2 = 9.55
+            self.insert_p3 = 6.2
+            self.insert_p3_y = 1.8
+            self.screw = Screw('M4')
+        else:
+            raise Exception('class `{}` not found'.format(class_))
+
+    def insert(self, height, length):
+        p0 = Vector(self.width / 2, 0)
+        p1 = Vector(self.width / 2, height)
+        p2 = Vector(self.insert_p2 / 2, p1.y)
+        p3 = Vector(self.insert_p3 / 2, p1.y + self.insert_p3_y)
+        points = [p0, p1, p2, p3]
+        points += [p.mx() for p in reversed(points)]
+        result = scad.polygon(points).extrude(length).rx(90).t(
+            self.width / 2,
+            length
+        )
+        result.com = scad.cube(self.width, length, height).com
+        return result
+
+    # def simple_insert(height, length):
+    #     p0 = Vector(width / 2, 0)
+    #     p1 = Vector(width / 2, height)
+    #     p2 = Vector(6.0 / 2, p1.y)
+    #     p3 = Vector(6.0 / 2, p1.y + 1.8)
+    #     points = [p0, p1, p2, p3]
+    #     points += [p.mx() for p in reversed(points)]
+    #     result = Path(points).extrude(length)
+    #     return result

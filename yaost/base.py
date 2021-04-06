@@ -3,9 +3,20 @@ import copy
 import hashlib
 import logging
 from lazy import lazy
-from .vector import Vector
+
+from yaost.vector import Vector
+from yaost.context import Operation
 
 logger = logging.getLogger(__name__)
+
+
+class _ByLabelPorxy(Operation):
+
+    def __init__(self, node):
+        self.__node = node
+
+    def __getattr__(self, key):
+        return self.__node.get_child_by_label(key)
 
 
 class DialectProxy(object):
@@ -33,6 +44,9 @@ class Node(object):
         self.os = DialectProxy(self)
         self.kwargs.pop('clone', None)
 
+        if '_label' not in self.kwargs and self._name not in {'!', '#', '*', '%'}:
+            self.kwargs['_label'] = self._name
+
     def __argument_to_string(self, arg):
         if isinstance(arg, str):
             # TODO fix this crutch
@@ -47,7 +61,7 @@ class Node(object):
             return '{}'.format(arg)
 
         if isinstance(arg, float):
-            return '{:.6f}'.format(arg)
+            return '{:.4f}'.format(arg)
 
         if isinstance(arg, list) or hasattr(arg, '__iter__'):
             return '[{}]'.format(','.join(self.__argument_to_string(v) for v in arg))
@@ -67,6 +81,11 @@ class Node(object):
             for descendant in child.traverse_children_deep_first():
                 yield descendant
         yield self
+
+    def _eval_variable(self, value):
+        if isinstance(value, Operation):
+            return value._eval(self)
+        return value
 
     def to_string(self, cache=None):
         if cache is not None and self.id in cache:
@@ -90,10 +109,13 @@ class Node(object):
 
         return '{}({}){}{}'.format(self._name, ','.join(args + kwargs), children, tail)
 
-    def module_name(self, name):
+    def module_name(self, label):
+        return self.label(label)
+
+    def label(self, label):
         kwargs = copy.deepcopy(self.kwargs)
-        kwargs['_module_name'] = name
-        return Node(self._name, self._children, *self.args, **kwargs)
+        kwargs['_label'] = label
+        return self.__class__(self._name, self._children, *self.args, **kwargs)
 
     def preview(self):
         return Node('if', [self], '$preview')
@@ -161,6 +183,13 @@ class Node(object):
         return Vector(0., 0., 0.)
 
     def t(self, x=0, y=0, z=0, **kwargs):
+        if isinstance(x, Vector) and y == z == 0:
+            x, y, z = x.x, x.y, x.z
+        else:
+            x = self._eval_variable(x)
+            y = self._eval_variable(y)
+            z = self._eval_variable(z)
+
         if x == y == z == 0:
             return self
 
@@ -170,12 +199,24 @@ class Node(object):
             y = -self.com.y
         if z in {'c', 'com'}:
             z = -self.com.z
-        return TransformationNode('translate', self, [x, y, z], **kwargs)
+        result = TransformationNode('translate', self, [x, y, z], **kwargs)
+        result.x = x
+        result.y = y
+        result.z = z
+        return result
 
     def r(self, x=0, y=0, z=0, xc=0, yc=0, zc=0, **kwargs):
         if x == y == z == 0:
             return self
 
+        x = self._eval_variable(x)
+        y = self._eval_variable(y)
+        z = self._eval_variable(z)
+
+        xc = self._eval_variable(xc)
+        yc = self._eval_variable(yc)
+        zc = self._eval_variable(zc)
+
         result = self
         if xc != 0 or yc != 0 or zc != 0:
             result = result.t(-xc, -yc, -zc)
@@ -183,19 +224,41 @@ class Node(object):
             result = result.t(xc, yc, zc)
         else:
             result = TransformationNode('rotate', result, [x, y, z], **kwargs)
+        result.x = x
+        result.y = y
+        result.z = z
+        result.xc = xc
+        result.yc = yc
+        result.zc = zc
         return result
 
     def s(self, x=1.0, y=1.0, z=1.0, **kwargs):
-        return TransformationNode('scale', self, [x, y, z], **kwargs)
+        x = self._eval_variable(x)
+        y = self._eval_variable(y)
+        z = self._eval_variable(z)
+        result = TransformationNode('scale', self, [x, y, z], **kwargs)
+        result.x = x
+        result.y = y
+        result.z = z
+        return result
 
     def m(self, x=0, y=0, z=0, xc=0, yc=0, zc=0, **kwargs):
         result = self
+        x = self._eval_variable(x)
+        y = self._eval_variable(y)
+        z = self._eval_variable(z)
         if xc != 0 or yc != 0 or zc != 0:
             result = result.t(-xc, -yc, -zc)
             result = TransformationNode('mirror', result, [x, y, z], **kwargs)
             result = result.t(xc, yc, zc)
         else:
             result = TransformationNode('mirror', result, [x, y, z], **kwargs)
+        result.x = x
+        result.y = y
+        result.z = z
+        result.xc = xc
+        result.yc = yc
+        result.zc = zc
         return result
 
     def extrude(self, *args, **kwargs):
@@ -244,7 +307,7 @@ class Node(object):
         return DistributiveNode('intersection', [self] + list(other))
 
     def hull(self, *other):
-        return DistributiveNode('hull', [self] + list(other))
+        return DistributiveNode('hull', [self] + list(other), to_collapse={'union', 'hull'})
 
     def offset(self, *args, **kwargs):
         return Node('offset', [self], *args, **kwargs)
@@ -273,6 +336,22 @@ class Node(object):
 
         return getattr(self._children[0], key)
 
+    def get_child_by_label(self, label):
+        stack = [self]
+        result = []
+        while stack:
+            node = stack.pop()
+            if node.kwargs.get('_label') == label:
+                result.append(node)
+            stack.extend(node._children)
+        if not result:
+            raise Exception(f'No resulsts found for label `{label}`')
+        return result[0]
+
+    @property
+    def by_label(self):
+        return _ByLabelPorxy(self)
+
 
 class TransformationNode(Node):
 
@@ -281,7 +360,7 @@ class TransformationNode(Node):
         is_clone = new_kwargs.pop('clone', False)
         if is_clone:
             clone = cls(*args, **new_kwargs)
-            union = DistributiveNode('union', clone._children + [clone])
+            union = DistributiveNode('union', clone._children + [clone], _apply_transformations=True)
             return union
         return super(TransformationNode, cls).__new__(cls)
 
@@ -302,12 +381,33 @@ class TransformationNode(Node):
 
 class DistributiveNode(Node):
 
-    def __init__(self, name, children, *args, **kwargs):
+    def __collapsable(self, child, to_collapse):
+        if child._name not in to_collapse:
+            return False
+        if child.kwargs.get('_label', child._name) != child._name:
+            return False
+        return True
+
+    def __init__(self, name, children, *args, to_collapse=None, _apply_transformations=False, **kwargs):
+        self.__apply_transformations = _apply_transformations
+        if to_collapse is None:
+            to_collapse = {name}
         flat_children = []
-        for child in children:
-            if child._name == name:
-                for grandchild in child._children:
-                    flat_children.append(grandchild)
+        children_stack = list(children)
+        while children_stack:
+            child = children_stack.pop()
+            if self.__collapsable(child, to_collapse):
+                children_stack.extend(child._children)
             else:
                 flat_children.append(child)
         super(DistributiveNode, self).__init__(name, flat_children, *args, **kwargs)
+
+    def _apply_same_transformations_to(self, other_object):
+        if not self.__apply_transformations:
+            return other_object
+        return self.__class__(
+            self._name,
+            [c._apply_same_transformations_to(other_object) for c in self._children],
+            *self.args,
+            **self.kwargs,
+        )
