@@ -200,9 +200,6 @@ class Node(object):
         if z in {'c', 'com'}:
             z = -self.com.z
         result = TransformationNode('translate', self, [x, y, z], **kwargs)
-        result.x = x
-        result.y = y
-        result.z = z
         return result
 
     def r(self, x=0, y=0, z=0, xc=0, yc=0, zc=0, **kwargs):
@@ -224,12 +221,6 @@ class Node(object):
             result = result.t(xc, yc, zc)
         else:
             result = TransformationNode('rotate', result, [x, y, z], **kwargs)
-        result.x = x
-        result.y = y
-        result.z = z
-        result.xc = xc
-        result.yc = yc
-        result.zc = zc
         return result
 
     def s(self, x=1.0, y=1.0, z=1.0, **kwargs):
@@ -237,9 +228,6 @@ class Node(object):
         y = self._eval_variable(y)
         z = self._eval_variable(z)
         result = TransformationNode('scale', self, [x, y, z], **kwargs)
-        result.x = x
-        result.y = y
-        result.z = z
         return result
 
     def m(self, x=0, y=0, z=0, xc=0, yc=0, zc=0, **kwargs):
@@ -253,12 +241,6 @@ class Node(object):
             result = result.t(xc, yc, zc)
         else:
             result = TransformationNode('mirror', result, [x, y, z], **kwargs)
-        result.x = x
-        result.y = y
-        result.z = z
-        result.xc = xc
-        result.yc = yc
-        result.zc = zc
         return result
 
     def extrude(self, *args, **kwargs):
@@ -298,6 +280,11 @@ class Node(object):
         return self.m(z=1, zc=center, **kwargs)
 
     def difference(self, other):
+        if self._name == 'difference' and len(self._children) == 2:
+            minuend, subtrahend = self._children
+            subtrahend = DistributiveNode('union', [subtrahend, other])
+            return Node('difference', [minuend, subtrahend], *self.args, **self.kwargs)
+
         return Node('difference', [self, other])
 
     def union(self, *other):

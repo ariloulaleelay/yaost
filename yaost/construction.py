@@ -36,7 +36,7 @@ def get_external_diameter_for_internal(d, pitch, theta=60):
     return d + H * 5 / 8
 
 
-def _thread(length, pitch, diameter, fn=32, tolerance=0, theta=60):
+def _thread(length, pitch, diameter, fn=32, clearance=0, theta=60):
     segments_per_revolution = fn
 
     if length < pitch / 2:
@@ -47,10 +47,10 @@ def _thread(length, pitch, diameter, fn=32, tolerance=0, theta=60):
     P = pitch
     H = P / (2 * tan(theta / 2 * pi / 180))
 
-    if tolerance == 'external':
-        tolerance = -_pitch_to_tolerance(pitch)
-    elif tolerance == 'internal':
-        tolerance = _pitch_to_tolerance(pitch)
+    if clearance == 'external':
+        clearance = -_pitch_to_clearance(pitch) / 2
+    elif clearance == 'internal':
+        clearance = _pitch_to_clearance(pitch) / 2
 
     # TODO change radiuses to match right dimension
     r = (D - H * 5 / 8) / 2
@@ -73,8 +73,8 @@ def _thread(length, pitch, diameter, fn=32, tolerance=0, theta=60):
         angle = segment / segments_per_revolution * pi * 2
         height = segment / segments * L - P
 
-        x, y = (r + tolerance) * cos(angle), (r + tolerance) * sin(angle)
-        X, Y = (R + tolerance) * cos(angle), (R + tolerance) * sin(angle)
+        x, y = (r + clearance) * cos(angle), (r + clearance) * sin(angle)
+        X, Y = (R + clearance) * cos(angle), (R + clearance) * sin(angle)
 
         h1.append([x, y, height - s / 2])
         h2.append([x, y, height + s / 2])
@@ -127,7 +127,7 @@ def _thread(length, pitch, diameter, fn=32, tolerance=0, theta=60):
         convexity=revolutions * 3,
     )
 
-    result = result.intersection(cylinder(d=(R + abs(tolerance * 2)) * 2, h=length))
+    result = result.intersection(cylinder(d=(R + abs(clearance * 2)) * 2, h=length))
     result.pitch = pitch
     result.D = R * 2
     result.d = r * 2
@@ -170,19 +170,19 @@ def _diameter_to_pitch(diameter):
         prev_pitch = pitch
 
 
-def _pitch_to_tolerance(pitch):
+def _pitch_to_clearance(pitch):
     return pitch * 0.0866 * 7 / 8 * 0.5 * 0.5  # 2.5% of H
 
 
 def m_thread_external(d=4, h=10, fn=64):
     pitch = _diameter_to_pitch(d)
-    tolerance = -_pitch_to_tolerance(pitch)
-    result = _thread(h, pitch, d, tolerance=tolerance, fn=fn)
+    clearance = -_pitch_to_clearance(pitch) / 2
+    result = _thread(h, pitch, d, clearance=clearance, fn=fn)
     return result
 
 
 def m_thread_internal_hole(d=4, h=10, fn=64):
     pitch = _diameter_to_pitch(d)
-    tolerance = _pitch_to_tolerance(pitch)
-    result = _thread(h, pitch, d, tolerance=tolerance, fn=fn)
+    clearance = _pitch_to_clearance(pitch) / 2
+    result = _thread(h, pitch, d, clearance=clearance, fn=fn)
     return result

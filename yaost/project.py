@@ -8,6 +8,7 @@ import logging
 import json
 import uuid
 import hashlib
+from collections import defaultdict
 from .module_watcher import ModuleWatcher
 from .local_logging import get_logger
 
@@ -96,20 +97,22 @@ class Project(object):
                     if value is not None:
                         fp.write('${}={:.4f};\n'.format(key, value))
                 cache = {}
-                node_index = 0
+                reserved_names = defaultdict(int)
                 for node in model.traverse_children_deep_first():
+                    if node.id in cache or node.depth < 0 or len(node._children) < 2:
+                        continue
                     node_string = node.to_string(cache=cache)
-                    if node.depth > 1 and node.id not in cache:
-                        node_index += 1
-                        label = node.kwargs.get('_label', '')
-                        if label:
-                            label = 'n{}_{}'.format(node_index, label)
-                        else:
-                            label = 'n{}'.format(node_index)
-                        fp.write('module {}(){{{}}} // {}\n'.format(
-                            label, node_string, node.id
-                        ))
-                        cache[node.id] = '{}();'.format(label)
+                    name = node.kwargs.get('_label', node._name)
+                    if name in reserved_names:
+                        label = 'n_{}_{}'.format(name, reserved_names[name])
+                    else:
+                        label = 'n_{}'.format(name)
+                    reserved_names[name] += 1
+
+                    fp.write('module {}(){{{}}} // {}\n'.format(
+                        label, node_string, node.id
+                    ))
+                    cache[node.id] = '{}();'.format(label)
                 fp.write(model.to_string(cache=cache))
 
     def watch(self, args):
