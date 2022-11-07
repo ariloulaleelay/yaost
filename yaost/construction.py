@@ -5,20 +5,6 @@ from .scad import cylinder, polyhedron
 
 logger = get_logger(__name__)
 
-# nuts = lambda: None  # noqa
-#
-# nuts.m4.set(
-#     height=3.2,
-#     width=7.,
-#     diameter=8.,
-#     internal_diameter=3.95,
-#     screw_diameter=4.1,
-# )
-
-
-def deg2rad(deg):
-    return deg * pi / 180
-
 
 def rounded_box(x, y, z, r=5, fn=32):
     result = cylinder(r=r, h=z, fn=fn).t(r, r, 0).mx(x / 2, clone=True).my(y / 2, clone=True).hull()

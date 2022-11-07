@@ -93,9 +93,9 @@ class Project(object):
             file_path = os.path.join(args.scad_directory, name + '.scad')
             with open(file_path, 'w') as fp:
                 for key in ('fa', 'fs', 'fn'):
-                    value = getattr(self, '_{}'.format(key), None)
+                    value = getattr(self, f'_{key}', None)
                     if value is not None:
-                        fp.write('${}={:.4f};\n'.format(key, value))
+                        fp.write(f'${key}={value:.4f};\n')
                 cache = {}
                 reserved_names = defaultdict(int)
                 for node in model.traverse_children_deep_first():
@@ -104,15 +104,13 @@ class Project(object):
                     node_string = node.to_string(cache=cache)
                     name = node.kwargs.get('_label', node._name)
                     if name in reserved_names:
-                        label = 'n_{}_{}'.format(name, reserved_names[name])
+                        label = f'n_{name}_{reserved_names[name]}'
                     else:
-                        label = 'n_{}'.format(name)
+                        label = f'n_{name}'
                     reserved_names[name] += 1
 
-                    fp.write('module {}(){{{}}} // {}\n'.format(
-                        label, node_string, node.id
-                    ))
-                    cache[node.id] = '{}();'.format(label)
+                    fp.write(f'module {label}(){{{node_string}}} // {node_id}\n')
+                    cache[node.id] = f'{label}();'
                 fp.write(model.to_string(cache=cache))
 
     def watch(self, args):

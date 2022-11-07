@@ -39,7 +39,7 @@ class Path(object):
     def __init__(self, points):
         self.points = []
         for p in points:
-            if isinstance(p, list):
+            if isinstance(p, (list, tuple)):
                 p = Vector(*p)
             assert isinstance(p, Vector), 'Point should be vector or [x, y, z] list'
             self.points.append(p)

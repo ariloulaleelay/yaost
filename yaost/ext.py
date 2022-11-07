@@ -1,7 +1,6 @@
 from yaost import scad, Vector
-from yaost.path import Path
 
-inf = 1000
+inf = 10000
 tol = 0.005
 
 
@@ -100,9 +99,7 @@ class Nema(object):
 
     @property
     def model(self):
-        result = rounded_box(
-            self.width, self.width, self.height, r=(self.width - self.hole_spacing) / 2
-        ).t('c', 'c', -self.height)
+        result = scad.cube(self.width, self.width, self.height).t('c', 'c', -self.height)
         result += scad.cylinder(d=self.ledge_diameter, h=self.ledge_height + tol).tz(-tol)
         result += (
             scad.cylinder(d=self.axel_diameter, h=self.axel_length)
@@ -145,13 +142,3 @@ class ExtrusionProfile(object):
         )
         result.com = scad.cube(self.width, length, height).com
         return result
-
-    # def simple_insert(height, length):
-    #     p0 = Vector(width / 2, 0)
-    #     p1 = Vector(width / 2, height)
-    #     p2 = Vector(6.0 / 2, p1.y)
-    #     p3 = Vector(6.0 / 2, p1.y + 1.8)
-    #     points = [p0, p1, p2, p3]
-    #     points += [p.mx() for p in reversed(points)]
-    #     result = Path(points).extrude(length)
-    #     return result
