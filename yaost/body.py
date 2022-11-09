@@ -204,12 +204,41 @@ def cube(
     x: float = 1,
     y: float = 0,
     z: float = 0,
+    r: float = 0,
+    chamfer_top: float = 0,
+    chamfer_bottom: float = 0,
 ) -> Cube:
+    from yaost.transformation import Hull
+
     if not y:
         y = x
     if not z:
         z = x
-    return Cube(x, y, z)
+
+    assert r * 2 <= min(x, y)
+
+    simple_cube = Cube(x, y, z)
+    if not r:
+        return simple_cube
+
+    pillar = cylinder(
+        r=r,
+        h=z,
+        chamfer_top=chamfer_top,
+        chamfer_bottom=chamfer_bottom,
+    ).t(
+        r, r
+    )
+    result = Hull([
+        pillar,
+        pillar.t(x - 2 * r),
+        pillar.t(x - 2 * r, y - 2 * r),
+        pillar.t(0, y - 2 * r),
+    ]).hull()
+    result.origin = simple_cube.origin
+    result.bbox = simple_cube.bbox
+    result.is_body = True
+    return result
 
 
 def cylinder(
@@ -221,11 +250,13 @@ def cylinder(
     r1: Optional[float] = None,
     r2: Optional[float] = None,
     fn: Optional[float] = None,
-    chamfer_top: Optional[float] = None,
-    chamfer_bottom: Optional[float] = None,
+    chamfer_top: Optional[float] = 0,
+    chamfer_bottom: Optional[float] = 0,
     label: Optional[str] = None,
 ) -> BaseBody:
-    return Cylinder(
+    from yaost.transformation import Hull
+
+    simple_cylinder = Cylinder(
         h=h,
         d=d,
         r=r,
@@ -236,6 +267,40 @@ def cylinder(
         fn=fn,
         label=label,
     )
+    if not chamfer_top and not chamfer_bottom:
+        return simple_cylinder
+
+    result = simple_cylinder
+    if chamfer_bottom:
+        bottom = Cylinder(
+            d1=simple_cylinder.d1 - chamfer_bottom * 2,
+            d2=simple_cylinder.d1,
+            h=chamfer_bottom
+        )
+    else:
+        bottom = Cylinder(
+            d=simple_cylinder.d1,
+            h=0.0001
+        )
+
+    if chamfer_top:
+        top = Cylinder(
+            d1=simple_cylinder.d2,
+            d2=simple_cylinder.d2 - chamfer_top * 2,
+            h=chamfer_top
+        ).tz(h - chamfer_top)
+    else:
+        top = Cylinder(
+            d=simple_cylinder.d1,
+            h=0.0001
+        ).tz(h - 0.0001)
+
+    result = Hull([top, bottom])
+
+    result.origin = simple_cylinder.origin
+    result.bbox = simple_cylinder.bbox
+    result.is_body = True
+    return result
 
 
 def sphere(*args, **kwargs):
