@@ -1,12 +1,12 @@
 # coding: utf8
 
-import logging
 from math import acos, pi, sqrt
 
-from .base import Node
-from .vector import Vector
+from yaost.body import GenericBody
+from yaost.vector import Vector
+from yaost.local_logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def point_orientation(a, b, c):
@@ -49,7 +49,10 @@ class Path(object):
         return points
 
     def polygon(self, convexity=2):
-        return Node('polygon', None, [p.as_array_2d for p in self.points], convexity=convexity)
+        return GenericBody(
+            'polygon', [p.as_array_2d for p in self.points],
+            convexity=convexity,
+        )
 
     def _triples(self):
         points = self._sort_ccw(self.points)
@@ -176,7 +179,7 @@ def stitch_slices(slices, convexity=10):
                 points_per_slice * (layer + 1) + (i + 1) % points_per_slice,
             ])
 
-    return Node('polyhedron', None, points=points, faces=faces, convexity=convexity)
+    return GenericBody('polyhedron', points=points, faces=faces, convexity=convexity)
 
 
 def blend_polar(a, b, alpha):

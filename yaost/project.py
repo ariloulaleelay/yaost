@@ -18,7 +18,13 @@ logger = get_logger(__name__)
 class Project(object):
     _single_run_guard = False
 
-    def __init__(self, name='Untitled', fa=3.0, fs=0.5, fn=None):
+    def __init__(
+        self,
+        name='Untitled',
+        fa=3.0,
+        fs=0.5,
+        fn=None,
+    ):
         self._fa = fa
         self._fs = fs
         self._fn = fn
@@ -32,11 +38,11 @@ class Project(object):
                 method = name_or_method
                 name_or_method = name_or_method.__name__.lower().replace('_', '-')
                 model = method()
-                if not model.kwargs.get('_label'):
-                    model = model.label(method.__name__)
+                # if not model.kwargs.get('_label'):
+                #     model = model.label(method.__name__)
             self.parts[name_or_method] = model
         except:  # noqa
-            logger.exception("failed to add model")
+            logger.exception('failed to add model')
         return method
 
     def get_part(self, name):
@@ -95,23 +101,26 @@ class Project(object):
                 for key in ('fa', 'fs', 'fn'):
                     value = getattr(self, f'_{key}', None)
                     if value is not None:
-                        fp.write(f'${key}={value:.4f};\n')
-                cache = {}
-                reserved_names = defaultdict(int)
-                for node in model.traverse_children_deep_first():
-                    if node.id in cache or node.depth < 0 or len(node._children) < 2:
-                        continue
-                    node_string = node.to_string(cache=cache)
-                    name = node.kwargs.get('_label', node._name)
-                    if name in reserved_names:
-                        label = f'n_{name}_{reserved_names[name]}'
-                    else:
-                        label = f'n_{name}'
-                    reserved_names[name] += 1
+                        fp.write(f'${key}={value:.6f};\n')
+                scad_code = model.to_scad()
+                # cache = {}
+                # reserved_names = defaultdict(int)
+                # for node in model.traverse_children_deep_first():
+                #     if node.id in cache or node.depth < 0 or len(node._children) < 2:
+                #         continue
+                #     node_string = node.to_string(cache=cache)
+                #     name = node.kwargs.get('_label', node._name)
+                #     if name in reserved_names:
+                #         label = f'n_{name}_{reserved_names[name]}'
+                #     else:
+                #         label = f'n_{name}'
+                #     reserved_names[name] += 1
 
-                    fp.write(f'module {label}(){{{node_string}}} // {node_id}\n')
-                    cache[node.id] = f'{label}();'
-                fp.write(model.to_string(cache=cache))
+                #     fp.write(f'module {label}(){{{node_string}}} // {node.id}\n')
+                #     cache[node.id] = f'{label}();'
+                # fp.write(model.to_string(cache=cache))
+                fp.write(scad_code)
+                fp.write('\n')
 
     def watch(self, args):
         try:
@@ -176,12 +185,12 @@ class Project(object):
             h = hashlib.sha256()
             for filename in filenames:
                 h.update(b'\0\0\0\1\0\0')
-                with open(filename, "rb") as f:
-                    for chunk in iter(lambda: f.read(4096), b""):  # noqa
+                with open(filename, 'rb') as f:
+                    for chunk in iter(lambda: f.read(4096), b''):  # noqa
                         h.update(chunk)
             return h.hexdigest()
         except Exception as e:  # noqa
-            logger.error("hashing gone wrong %s %s", filename, e)
+            logger.error('hashing gone wrong %s %s', filename, e)
             return str(uuid.uuid4())
 
     def run(self):
@@ -190,12 +199,24 @@ class Project(object):
         Project._single_run_guard = True
 
         parser = argparse.ArgumentParser(sys.argv[0])
-        parser.add_argument('--scad-directory', type=str, help='directory to store .scad files', default='scad')
-        parser.add_argument('--stl-directory', type=str, help='directory to store .stl files', default='stl')
-        parser.add_argument('--build-directory', type=str, help='directory to store result files', default='build')
-        parser.add_argument('--cache-file', type=str, help='file to store some cahces', default='.yaost.cache')
-        parser.add_argument('--force', action='store_true', help='force action', default=False)
-        parser.add_argument('--debug', action='store_true', help='enable debug output', default=False)
+        parser.add_argument(
+            '--scad-directory', type=str, help='directory to store .scad files', default='scad'
+        )
+        parser.add_argument(
+            '--stl-directory', type=str, help='directory to store .stl files', default='stl'
+        )
+        parser.add_argument(
+            '--build-directory', type=str, help='directory to store result files', default='build'
+        )
+        parser.add_argument(
+            '--cache-file', type=str, help='file to store some cahces', default='.yaost.cache'
+        )
+        parser.add_argument(
+            '--force', action='store_true', help='force action', default=False
+        )
+        parser.add_argument(
+            '--debug', action='store_true', help='enable debug output', default=False
+        )
         parser.set_defaults(func=lambda args: parser.print_help())
         subparsers = parser.add_subparsers(help='sub command help')
 
@@ -216,5 +237,7 @@ class Project(object):
         loglevel = logging.INFO
         if args.debug:
             loglevel = logging.DEBUG
-        logging.basicConfig(level=loglevel, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        logging.basicConfig(
+            level=loglevel, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        )
         args.func(args)

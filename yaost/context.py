@@ -2,13 +2,31 @@
 import copy
 import hashlib
 import logging
+from typing import Optional, List
 from lazy import lazy
 
 
 class Operation(object):
 
-    def _eval(self, node):
+    def __call__(self, node, **kwargs):
         raise NotImplemented
+
+    def _find_body(self, node):
+        from yaost.transformation import (
+            SingleChildTransformation,
+            MultipleChildrenTransformation,
+        )
+        if node.is_body:
+            return node
+
+        if isinstance(node, MultipleChildrenTransformation):
+            for child in node.children:
+                result = self._find_body(child)
+                if result is not None:
+                    return result
+        elif isinstance(node, SingleChildTransformation):
+            return self._find_body(node.child)
+        return None
 
     def __add__(self, other):
         return BinaryOperation(self, other, operator=lambda x, y: x + y)
@@ -46,7 +64,7 @@ class ConstOperation(Operation):
     def __init__(self, value):
         self._value = value
 
-    def _eval(self, node):
+    def __call__(self, node, **kwargs):
         return self._value
 
 
@@ -61,8 +79,8 @@ class BinaryOperation(Operation):
         self._right = right
         self._operator = operator
 
-    def _eval(self, node):
-        return self._operator(self._left._eval(node), self._right._eval(node))
+    def __call__(self, node, **kwargs):
+        return self._operator(self._left(node, **kwargs), self._right(node, **kwargs))
 
 
 class NodeByLabel(Operation):
@@ -72,7 +90,7 @@ class NodeByLabel(Operation):
         if path is not None:
             self._path = list(path)
 
-    def _eval(self, node):
+    def __call__(self, node, **kwargs):
         from yaost.base import Node
 
         assert self._path, 'Path should be greater than 0'
@@ -92,4 +110,34 @@ class NodeByLabel(Operation):
         return NodeByLabel(self._path + [key])
 
 
+class BodyContext(Operation):
+
+    def __init__(self, path: List[str] = ()):
+        self._path = list(path)
+
+    def __call__(self, obj, **kwargs):
+        body = self._find_body(obj)
+
+        if body is None:
+            raise RuntimeError('Could not find body')
+
+        result = body
+        for attr in self._path:
+            result = getattr(result, attr)
+        return result
+
+    def __getattr__(self, key):
+        return self.__class__(self._path + [key])
+
+
+class CenterContext(Operation):
+
+    def __call__(self, obj, axis: str = None, **kwargs):
+        if axis not in ('xyz'):
+            raise RuntimeError(f'Wrong axis `{axis}`')
+        return -getattr(obj.origin, axis)
+
+
 by_label = NodeByLabel()
+body = BodyContext()
+center = CenterContext()
