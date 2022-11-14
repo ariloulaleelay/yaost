@@ -348,11 +348,10 @@ class BaseObject:
         return Intersection([self, other], label=label)
 
     def linear_extrude(self, height: float, **kwargs):
-        from yaost.transformation import GenericSingleTransformation
-        return GenericSingleTransformation(
-            'linear_extrude',
-            self,
+        from yaost.transformation import LinearExtrude
+        return LinearExtrude(
             height,
+            self,
             **kwargs
         )
 
