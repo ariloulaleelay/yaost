@@ -414,7 +414,7 @@ class LinearExtrude(SingleChildTransformation):
 
         # TODO make proper bbox
         self.bbox = child.bbox
-        self.origin = child.origin.t(x=height / 2)
+        self.origin = child.origin.tz(z=height / 2)
 
         self.child = child
         self._height = height
