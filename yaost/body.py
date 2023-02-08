@@ -48,12 +48,14 @@ class Cube(BaseBody):
         x: float = 0,
         y: float = 0,
         z: float = 0,
+        label: Optional[str] = None,
     ):
         self.x = x
         self.y = y
         self.z = z
         self.origin = Vector(x / 2, y / 2, z / 2)
         self.bbox = BBox(Vector(), Vector(x, y, z))
+        self.label = label
 
     def to_scad(self):
         return 'cube({});'.format(
@@ -207,6 +209,7 @@ def cube(
     r: float = 0,
     chamfer_top: float = 0,
     chamfer_bottom: float = 0,
+    label: Optional[str] = None,
 ) -> Cube:
     from yaost.transformation import Hull
 
@@ -238,6 +241,7 @@ def cube(
     result.origin = simple_cube.origin
     result.bbox = simple_cube.bbox
     result.is_body = True
+    result.label = label
     return result
 
 

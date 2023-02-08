@@ -14,10 +14,12 @@ def _serialize_argument(v):
         chunk = nice_float(v)
     elif isinstance(v, Vector):
         chunk = _serialize_argument([v.x, v.y, v.z])
-    elif isinstance(v, list):
+    elif isinstance(v, (list, tuple)):
         chunk = '[{}]'.format(','.join(_serialize_argument(vv) for vv in v))
-    else:
+    elif isinstance(v, str):
         chunk = f'"{v}"'
+    else:
+        raise RuntimeError(f'Unknown type of v: {type(v)}')
     return chunk
 
 

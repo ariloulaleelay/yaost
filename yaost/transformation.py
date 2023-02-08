@@ -534,6 +534,9 @@ class Modifier(SingleChildTransformation):
         self.child = child
         self._name = name
 
+    def _clone_with_another_child(self, another_child: BaseObject):
+        return self.__class__(self._name, self.child)
+
     def to_scad(self):
         return '{}{}'.format(
             self._name,

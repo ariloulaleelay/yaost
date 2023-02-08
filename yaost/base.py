@@ -65,8 +65,8 @@ class BaseObject:
 
     def _eval_operation(
         self,
-        value: Optional[TUnion[float, Operation]],
-        axis: str
+        value: Optional[TUnion[float, Vector, Operation]],
+        axis: Optional[str] = None
     ):
         if value == 'c':
             value = ctx.center
@@ -98,6 +98,25 @@ class BaseObject:
 
         result = Translate(
             Vector(x, y, z),
+            self,
+            clone=clone,
+            label=label,
+        )
+        return result
+
+    def tv(
+        self,
+        v: TUnion[Vector] = 0,
+        clone: bool = False,
+        label: Optional[str] = None,
+    ) -> 'BaseObject':
+        from yaost.transformation import Translate
+        v = self._eval_operation(v)
+        if not v:
+            return self
+
+        result = Translate(
+            v,
             self,
             clone=clone,
             label=label,
@@ -395,11 +414,12 @@ class BaseObject:
             **kwargs
         )
 
-    def color(self, **kwargs):
+    def color(self, *args, **kwargs):
         from yaost.transformation import GenericSingleTransformation
         return GenericSingleTransformation(
             'color',
             self,
+            *args,
             **kwargs
         )
 
