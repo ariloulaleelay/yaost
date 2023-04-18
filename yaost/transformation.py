@@ -78,7 +78,7 @@ class Translate(SingleChildTransformation):
 
     @property
     def y(self):
-        return self._vector.x
+        return self._vector.y
 
     @property
     def z(self):
@@ -93,6 +93,9 @@ class Translate(SingleChildTransformation):
         if self._clone:
             result = f'union(){{{child_str}{result}}}'
         return result
+
+    def __repr__(self):
+        return f'<Translate({self._vector})>'
 
 
 class Rotate(SingleChildTransformation):

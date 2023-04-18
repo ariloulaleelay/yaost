@@ -209,7 +209,7 @@ class Vector:
         return Vector(-self.x, -self.y, -self.z)
 
     def __str__(self):
-        return "Vector(%f, %f, %f)" % (self.x, self.y, self.z)
+        return f"Vector({self.x:f}, {self.y:f}, {self.z:f})"
 
     def __bool__(self):
         return bool(self.x or self.y or self.z)
