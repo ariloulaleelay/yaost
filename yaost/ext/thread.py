@@ -66,32 +66,38 @@ def triangle_profile(
 
     tan_half_theta = tan(theta / 2 * pi / 180)
     H = pitch / (2 * tan_half_theta)
-    dh = H * (1 - top_cut - bottom_cut)
 
-    points = [(0, 0)]
-    points.append((-dh, dh * tan_half_theta))
+    r_maj = diameter / 2
+    r_min = r_maj + H * (bottom_cut - 7 / 8) + clearance
+    r_max = r_maj + H * (1 / 8 - top_cut) + clearance
+    dp_low = H * bottom_cut * tan_half_theta
+    dp_high = H * top_cut * tan_half_theta
 
-    if bottom_cut != 0:
-        points.append((
-            -dh,
-            pitch / 2 + H * bottom_cut * tan_half_theta
-        ))
-    if top_cut != 0:
-        points.append((
-            0,
-            pitch - H * top_cut * tan_half_theta * 2
-        ))
+    points = []
+    if dp_low:
+        points.append((r_min, -dp_low))
+        points.append((r_min, dp_low))
+    else:
+        points.append((r_min, 0))
 
-    points.append((0, pitch))
-    return [(diameter / 2 + clearance + x, y) for x, y in points]
+    if dp_high:
+        points.append((r_max, pitch / 2 - dp_high))
+        points.append((r_max, pitch / 2 + dp_high))
+    else:
+        points.append((r_max, pitch / 2))
+
+    points.append((r_min, pitch - dp_low))
+    return points
 
 
 def profile_helix(
-    profile, length, fn=32, er1=0, er2=0, direction=1
+    profile, length, fn=32, er1=0, er2=0, direction=1,
+    chamfer_top=0,
+    chamfer_bottom=0,
 ):
     pitch = profile[-1][1] - profile[0][1]
-    assert profile[0][0] == profile[-1][0], 'Starting and finishing ponts should match in x'
-    profile.pop()
+    assert profile[0][0] == profile[-1][0], 'Starting and finishing points should match in x'
+    profile = profile[:-1]
 
     assert pitch > 0, 'Pitch should be greater than zero'
     revolutions = (length + 4 * pitch) / pitch
@@ -187,7 +193,11 @@ def profile_helix(
         convexity=revolutions * 1,
     )
     result = result.intersection(
-        cylinder(d=max_r * 2 + 1, h=length).tz(profile[0][1])
+        cylinder(
+            d=max_r * 2 + 1, h=length,
+            chamfer_top=chamfer_top,
+            chamfer_bottom=chamfer_bottom,
+        ).tz(profile[0][1])
     )
     return result
 
