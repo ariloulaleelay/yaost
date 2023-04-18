@@ -28,6 +28,24 @@ class Operation(object):
             return self._find_body(node.child)
         return None
 
+    def _find_first(self, node, callback):
+        from yaost.transformation import (
+            SingleChildTransformation,
+            MultipleChildrenTransformation,
+        )
+        result = callback(node)
+        if result is not None:
+            return result
+
+        if isinstance(node, MultipleChildrenTransformation):
+            for child in node.children:
+                result = self._find_first(child, callback)
+                if result is not None:
+                    return result
+        elif isinstance(node, SingleChildTransformation):
+            return self._find_first(node.child, callback)
+        return None
+
     def __add__(self, other):
         return BinaryOperation(self, other, operator=lambda x, y: x + y)
 
@@ -90,24 +108,28 @@ class NodeByLabel(Operation):
         if path is not None:
             self._path = list(path)
 
-    def __call__(self, node, **kwargs):
-        from yaost.base import Node
+    def __call__(self, obj, **kwargs):
+        label, path = self._path[0], self._path[1:]
 
-        assert self._path, 'Path should be greater than 0'
-        label, keys = self._path[0], self._path[1:]
-        value = node.get_child_by_label(label)
-        for key in keys:
-            if hasattr(value, key):
-                value = getattr(value, key)
-                continue
-            elif isinstance(value, Node) and key in value._kwargs:
-                value = value._kwargs[key]
-            else:
-                raise Exception(f'Could not find value for {key}')
-        return value
+        def _filter(node):
+            if node.label == label:
+                return node
+            return None
+
+        result = self._find_first(obj, _filter)
+        if result is None:
+            raise RuntimeError('Could not find node')
+
+        for attr in path:
+            result = getattr(result, attr)
+        return result
 
     def __getattr__(self, key):
-        return NodeByLabel(self._path + [key])
+        return self.__class__(self._path + [key])
+
+    def __getitem__(self, key):
+        return self.__class__(self._path + [key])
+
 
 
 class BodyContext(Operation):
@@ -136,6 +158,49 @@ class CenterContext(Operation):
         if axis not in ('xyz'):
             raise RuntimeError(f'Wrong axis `{axis}`')
         return -getattr(obj.origin, axis)
+
+
+class Inspector:
+
+    def __init__(self, obj: 'BaseObject'):
+        self._obj = obj
+
+    def get_body(self):
+        obj = self._find_first(self._obj, lambda x: x.is_obj)
+        return obj
+
+    def get_by_label(self, label: str):
+        obj = self._find_first(self._obj, lambda x: x.label == label)
+        return obj
+
+    def _find_first(self, obj, filter_function):
+        from yaost.transformation import (
+            SingleChildTransformation,
+            MultipleChildrenTransformation,
+        )
+        if filter_function(obj):
+            return obj
+
+        if isinstance(obj, MultipleChildrenTransformation):
+            for child in obj.children:
+                result = self._find_first(child, filter_function)
+                if result is not None:
+                    return result
+        elif isinstance(obj, SingleChildTransformation):
+            return self._find_first(obj.child, filter_function)
+        return None
+
+
+class QProxy:
+
+    def __init__(self, obj: 'BaseObject'):
+        self._obj = obj
+
+    def __getattr__(self, key: str):
+        return Inspector(self._obj).get_by_label(key)
+
+    def __getitem__(self, key: str):
+        return Inspector(self._obj).get_by_label(key)
 
 
 by_label = NodeByLabel()

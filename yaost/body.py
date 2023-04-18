@@ -220,7 +220,7 @@ def cube(
 
     assert r * 2 <= min(x, y)
 
-    simple_cube = Cube(x, y, z)
+    simple_cube = Cube(x, y, z, label=label)
     if not r:
         return simple_cube
 

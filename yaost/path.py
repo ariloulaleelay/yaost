@@ -137,6 +137,9 @@ class Path(object):
     def extrude(self, *args, **kwargs):
         return self.polygon().extrude(*args, **kwargs)
 
+    def rotate(self, ax=0, ay=0, az=0):
+        return Path([p.rotate(ax, ay, az) for p in self.points])
+
 
 def stitch_slices(slices, convexity=10):
     slice_count = len(slices)

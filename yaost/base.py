@@ -80,6 +80,17 @@ class BaseObject:
         from yaost.body import Group
         return Group(self, label=label)
 
+    def l(self, key: str):
+        return ctx.NodeByLabel([key])(self)
+
+    @property
+    def q(self):
+        return ctx.QProxy(self)
+
+    @property
+    def body(self):
+        return ctx.Inspector(self).get_body()
+
     def t(
         self,
         x: TUnion[float, Operation] = 0,
@@ -395,8 +406,13 @@ class BaseObject:
             **kwargs
         )
 
-    def render(self):
-        return self
+    def render(self, **kwargs):
+        from yaost.transformation import GenericSingleTransformation
+        return GenericSingleTransformation(
+            'render',
+            self,
+            **kwargs
+        )
 
     def projection(self, **kwargs):
         from yaost.transformation import GenericSingleTransformation
