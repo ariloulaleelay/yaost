@@ -197,7 +197,7 @@ def profile_helix(
             d=max_r * 2 + 1, h=length,
             chamfer_top=chamfer_top,
             chamfer_bottom=chamfer_bottom,
-        ).tz(profile[0][1])
+        ) # .tz(profile[0][1])
     )
     return result
 
