@@ -7,7 +7,8 @@ try:
 except ImportError:
     logging.getLogger(__name__).exception('You should install shapely to use gears module')
 
-from . import scad
+from yaost.body import polygon, circle
+from yaost.transformation import union
 
 inf = 10000
 
@@ -85,7 +86,7 @@ def gear_profile(
                 best_hole = hole_
         holes = best_hole
     coords = holes.exterior.coords
-    tooth = scad.polygon(points=coords)
+    tooth = polygon(points=coords)
     if internal:
         tooth = tooth.my()
     tooth = tooth.ty(-radius - shift)
@@ -93,17 +94,17 @@ def gear_profile(
     holes = []
     for i in range(teeth_count):
         holes.append(tooth.rz(360 * i / teeth_count))
-    teeth = scad.union(*holes).render()
+    teeth = union(*holes).render()
     if hole:
         if internal:
-            result = teeth + scad.circle(r=radius - ad)
+            result = teeth + circle(r=radius - ad)
         else:
-            result = scad.circle(r=inf) - scad.circle(r=radius + ad) + teeth
+            result = circle(r=inf) - circle(r=radius + ad) + teeth
     else:
         if internal:
             if external_radius is None:
                 external_radius = radius + dd + 1
-            result = scad.circle(r=external_radius) - teeth - scad.circle(r=radius - ad + shift)
+            result = circle(r=external_radius) - teeth - circle(r=radius - ad + shift)
         else:
-            result = scad.circle(r=radius + ad + shift) - teeth
+            result = circle(r=radius + ad + shift) - teeth
     return result.render()
