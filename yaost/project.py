@@ -8,6 +8,8 @@ import logging
 import json
 import uuid
 import hashlib
+from typing import Any, Tuple
+
 from collections import defaultdict
 from .module_watcher import ModuleWatcher
 from .local_logging import get_logger
@@ -31,25 +33,43 @@ class Project(object):
         self.name = name
         self.parts = {}
 
+    def add_class(self, class_):
+        for key in dir(class_):
+            value = getattr(class_, key, None)
+            if not getattr(value, '_yaost_part', False):
+                continue
+            name = class_.__name__ + '.' + value.__name__
+            self.parts[name] = lambda: getattr(class_(), key)()
+
+    def part(self, method):
+        method._yaost_part = True
+        return method
+
     def add_part(self, name_or_method, model=None):
         method = None
         try:
             if callable(name_or_method):
                 method = name_or_method
-                name_or_method = name_or_method.__name__.lower().replace('_', '-')
-                model = method()
-                # if not model.kwargs.get('_label'):
-                #     model = model.label(method.__name__)
-            self.parts[name_or_method] = model
+                name_or_method = method.__name__.replace('_', '-')
+            else:
+                method = lambda: model
+            self.parts[name_or_method] = method
         except:  # noqa
             logger.exception('failed to add model')
         return method
 
-    def get_part(self, name):
-        return self.parts[name]
-
     def build_stl(self, args):
         self.build(args, stl_only=True)
+
+    def iterate_parts(self):
+        for name in sorted(self.parts):
+            method = self.parts[name]
+            try:
+                model = method()
+            except: # noqa
+                logger.exception(f'failed to run model {name}')
+                continue
+            yield name, model
 
     def build(self, args, stl_only=False):
         self.build_scad(args)
@@ -60,8 +80,8 @@ class Project(object):
         if not os.path.exists(args.build_directory):
             os.makedirs(args.build_directory)
 
-        for name, model in self.parts.items():
-            scad_file_path = os.path.join(args.scad_directory, name + '.scad')
+        for name, model in self.iterate_parts():
+            scad_file_path = os.path.join(args.scad_directory, self.name, name + '.scad')
 
             extension = '.stl'
             if model.is_2d:
@@ -91,36 +111,18 @@ class Project(object):
         self._write_cache(args.cache_file, cache)
 
     def build_scad(self, args):
-        if not os.path.exists(args.scad_directory):
-            os.makedirs(args.scad_directory)
-
-        for name, model in self.parts.items():
-            logger.info('building %s.scad', name)
-            file_path = os.path.join(args.scad_directory, name + '.scad')
+        for name, model in self.iterate_parts():
+            file_path = os.path.join(args.scad_directory, self.name, name + '.scad')
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'w') as fp:
                 for key in ('fa', 'fs', 'fn'):
                     value = getattr(self, f'_{key}', None)
                     if value is not None:
                         fp.write(f'${key}={value:.6f};\n')
                 scad_code = model.to_scad()
-                # cache = {}
-                # reserved_names = defaultdict(int)
-                # for node in model.traverse_children_deep_first():
-                #     if node.id in cache or node.depth < 0 or len(node._children) < 2:
-                #         continue
-                #     node_string = node.to_string(cache=cache)
-                #     name = node.kwargs.get('_label', node._name)
-                #     if name in reserved_names:
-                #         label = f'n_{name}_{reserved_names[name]}'
-                #     else:
-                #         label = f'n_{name}'
-                #     reserved_names[name] += 1
-
-                #     fp.write(f'module {label}(){{{node_string}}} // {node.id}\n')
-                #     cache[node.id] = f'{label}();'
-                # fp.write(model.to_string(cache=cache))
                 fp.write(scad_code)
                 fp.write('\n')
+            # logger.info('done %s.scad', name)
 
     def watch(self, args):
         try:
