@@ -185,12 +185,12 @@ class Union(MultipleChildrenTransformation):
     def _get_flat_children(cls, children):
         result = []
         for child in children:
-            if isinstance(child, Union):
+            if isinstance(child, Union) and child.label is None:
                 for subchild in cls._get_flat_children(child.children):
                     result.append(subchild)
             else:
                 result.append(child)
-        return result
+        return sorted(result, key=lambda x: x.to_scad())
 
     def to_scad(self):
         return 'union(){}'.format(self._children_to_scad())
@@ -218,12 +218,12 @@ class Hull(MultipleChildrenTransformation):
     def _get_flat_children(cls, children):
         result = []
         for child in children:
-            if isinstance(child, (Union, Hull)):
+            if isinstance(child, (Union, Hull)) and child.label is None:
                 for subchild in cls._get_flat_children(child.children):
                     result.append(subchild)
             else:
                 result.append(child)
-        return result
+        return sorted(result, key=lambda x: x.to_scad())
 
     def to_scad(self):
         return 'hull(){}'.format(self._children_to_scad())
@@ -239,13 +239,25 @@ class Intersection(MultipleChildrenTransformation):
         # TODO calculate bbox properly
         self.bbox = BBox()
         self.label = label
+        flat_children = self._get_flat_children(children)
         # TODO calculate origin properly
         self.origin = reduce(
             lambda x, y: x + y.origin,
-            children,
+            flat_children,
             Vector()
-        ) / len(children)
+        ) / len(flat_children)
         self.children = children
+
+    @classmethod
+    def _get_flat_children(cls, children):
+        result = []
+        for child in children:
+            if isinstance(child, Intersection) and child.label is None:
+                for subchild in cls._get_flat_children(child.children):
+                    result.append(subchild)
+            else:
+                result.append(child)
+        return sorted(result, key=lambda x: x.to_scad())
 
     def to_scad(self):
         return 'intersection(){}'.format(self._children_to_scad())
@@ -262,9 +274,27 @@ class Difference(MultipleChildrenTransformation):
         # TODO calculate bbox properly
         self.bbox = children[0].bbox
         self.label = label
+        first = children[0]
+        flat_children = self._get_flat_children(children[1:])
+
         # TODO calculate origin properly
-        self.origin = children[0].origin
-        self.children = children
+        self.origin = first.origin
+        if len(flat_children) > 1:
+            second = Union(flat_children)
+        else:
+            second = flat_children[0]
+        self.children = [first, second]
+
+    @classmethod
+    def _get_flat_children(cls, children):
+        result = []
+        for child in children:
+            if isinstance(child, Union) and child.label is None:
+                for subchild in cls._get_flat_children(child.children):
+                    result.append(subchild)
+            else:
+                result.append(child)
+        return sorted(result, key=lambda x: x.to_scad())
 
     def to_scad(self):
         return 'difference(){}'.format(self._children_to_scad())
@@ -414,12 +444,11 @@ class LinearExtrude(SingleChildTransformation):
         fn: Optional[float] = None,
         label: Optional[str] = None,
     ):
-        self.label = label
-
         # TODO make proper bbox
         self.bbox = child.bbox
         self.origin = child.origin.tz(z=height / 2)
 
+        self.label = label
         self.child = child
         self._height = height
         self._convexity = convexity
@@ -454,12 +483,11 @@ class RotateExtrude(SingleChildTransformation):
         fn: Optional[float] = None,
         label: Optional[str] = None,
     ):
-        self.label = label
-
         # TODO make proper bbox
         self.bbox = child.bbox
         self.origin = Vector()
 
+        self.label = label
         self.child = child
         self._angle = angle
         self._convexity = convexity

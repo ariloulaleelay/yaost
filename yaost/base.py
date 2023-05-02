@@ -20,6 +20,21 @@ class BaseObject:
     def to_scad(self):
         raise NotImplementedError
 
+    def traverse_all(self):
+        from yaost.transformation import (
+            SingleChildTransformation,
+            MultipleChildrenTransformation,
+        )
+
+        if isinstance(self, MultipleChildrenTransformation):
+            for child in self.children:
+                for subchild in child.traverse_all():
+                    yield subchild
+        elif isinstance(self, SingleChildTransformation):
+            for subchild in self.child.traverse_all():
+                yield subchild
+        yield self
+
     def _get_body_stack(self, label: Optional[str] = None):
         from yaost.transformation import (
             SingleChildTransformation,
