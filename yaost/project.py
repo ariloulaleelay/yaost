@@ -34,12 +34,13 @@ class Project(object):
         self.parts = {}
 
     def add_class(self, class_):
+        obj = class_()
         for key in dir(class_):
             value = getattr(class_, key, None)
             if not getattr(value, '_yaost_part', False):
                 continue
             name = class_.__name__ + '.' + value.__name__
-            self.parts[name] = lambda: getattr(class_(), key)()
+            self.parts[name] = getattr(obj, key)
 
     def part(self, method):
         method._yaost_part = True
@@ -122,7 +123,7 @@ class Project(object):
                 scad_code = model.to_scad()
                 fp.write(scad_code)
                 fp.write('\n')
-            # logger.info('done %s.scad', name)
+        logger.info('scad build done')
 
     def watch(self, args):
         try:
