@@ -61,6 +61,9 @@ class Operation(object):
     def __mul__(self, other):
         return BinaryOperation(self, other, operator=lambda x, y: x * y)
 
+    def __neg__(self):
+        return UnaryOperation(self, operator=lambda x: -x)
+
     def __rmul__(self, other):
         return BinaryOperation(other, self, operator=lambda x, y: x * y)
 
@@ -99,6 +102,19 @@ class BinaryOperation(Operation):
 
     def __call__(self, node, **kwargs):
         return self._operator(self._left(node, **kwargs), self._right(node, **kwargs))
+
+
+class UnaryOperation(Operation):
+
+    def __init__(self, operand, operator):
+        if isinstance(operand, Operation):
+            self._operand = operand
+        else:
+            self._operand = ConstOperation(operand)
+        self._operator = operator
+
+    def __call__(self, node, **kwargs):
+        return self._operator(self._operand(node, **kwargs))
 
 
 class NodeByLabel(Operation):
