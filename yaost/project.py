@@ -8,16 +8,14 @@ import logging
 import json
 import uuid
 import hashlib
-from typing import Any, Tuple
 
-from collections import defaultdict
 from .module_watcher import ModuleWatcher
 from .local_logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class Project(object):
+class Project:
     _single_run_guard = False
 
     def __init__(
@@ -37,13 +35,14 @@ class Project(object):
         obj = class_()
         for key in dir(class_):
             value = getattr(class_, key, None)
-            if not getattr(value, '_yaost_part', False):
+            if not getattr(value, '__yaost_part__', False):
                 continue
             name = class_.__name__ + '.' + value.__name__
             self.parts[name] = getattr(obj, key)
+        return class_
 
     def part(self, method):
-        method._yaost_part = True
+        method.__yaost_part__ = True
         return method
 
     def add_part(self, name_or_method, model=None):
@@ -53,7 +52,9 @@ class Project(object):
                 method = name_or_method
                 name_or_method = method.__name__.replace('_', '-')
             else:
-                method = lambda: model
+                def method_():
+                    return model
+                method = method_
             self.parts[name_or_method] = method
         except:  # noqa
             logger.exception('failed to add model')
@@ -126,36 +127,33 @@ class Project(object):
         logger.info('scad build done')
 
     def watch(self, args):
-        try:
-            import __main__
+        import __main__
 
-            def build_scad_generator(args, script_path):
-                def real_scad_generator(*args_array, **kwargs_hash):
-                    command_args = [
-                        __main__.__file__,
-                        '--scad-directory', args.scad_directory,
-                    ]
-                    if args.debug:
-                        command_args.append('--debug')
-                    command_args.append('build-scad')
-                    try:
-                        subprocess.call(command_args, shell=False)
-                    except OSError:
-                        time.sleep(0.1)
-                        subprocess.call(command_args, shell=False)
-
-                return real_scad_generator
-            callback = build_scad_generator(args, __main__.__file__)
-            mw = ModuleWatcher(__main__.__file__, callback)
-            try:
-                callback()
-                mw.start_watching()
-                while True:
+        def build_scad_generator(args, script_path):
+            def real_scad_generator(*args_array, **kwargs_hash):
+                command_args = [
+                    __main__.__file__,
+                    '--scad-directory', args.scad_directory,
+                ]
+                if args.debug:
+                    command_args.append('--debug')
+                command_args.append('build-scad')
+                try:
+                    subprocess.call(command_args, shell=False)
+                except OSError:
                     time.sleep(0.1)
-            finally:
-                mw.stop_watching()
-        except ImportError:
-            raise
+                    subprocess.call(command_args, shell=False)
+
+            return real_scad_generator
+        callback = build_scad_generator(args, __main__.__file__)
+        mw = ModuleWatcher(__main__.__file__, callback)
+        try:
+            callback()
+            mw.start_watching()
+            while True:
+                time.sleep(0.1)
+        finally:
+            mw.stop_watching()
 
     def _get_caller_module_name(self, depth=1):
         frm = inspect.stack()[depth + 1]
@@ -176,7 +174,7 @@ class Project(object):
 
     def _write_cache(self, cache_file, cache):
         try:
-            with open(cache_file, 'w') as fp:
+            with open(cache_file, 'w', encoding='utf-8') as fp:
                 json.dump(cache, fp, ensure_ascii=False)
         except:  # noqa
             logger.error('writing cache failed', exc_info=True)
