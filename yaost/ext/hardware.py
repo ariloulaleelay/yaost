@@ -1,5 +1,8 @@
 from enum import Enum
+from math import sqrt
+
 from yaost import cylinder, hull
+from yaost.ext import thread
 
 inf = 1000
 tol = 0.01
@@ -11,7 +14,7 @@ class CapType(Enum):
     oval = 'oval'
     truss = 'truss'
     round_ = 'round'
-    hex_ = 'hex'
+    hex = 'hex'
     hex_washer = 'hex_washer'
     socket = 'socket'
     button = 'button'
@@ -20,10 +23,22 @@ class CapType(Enum):
 class Nut(object):
 
     _config = {
-        3.0: (2.75, 6.3, 2.6, 5.5),
-        4.0: (3.4, 8.0, 3.5, 6.9),
-        5.0: (4.34, 8.9, 3.82, 7.83),
-        6.0: (5, 11.1, 5, 10),
+        2.5: (5.45, 2.0),
+        3.0: (6.01, 2.40),
+        4.0: (7.66, 3.20),
+        5.0: (8.79, 4.7),
+        6.0: (11.05, 5.20),
+        8.0: (14.38, 6.80),
+        10.0: (17.77, 8.40),
+        12.0: (21.70, 10.80),
+        14.0: (23.36, 12.80),
+        16.0: (26.75, 14.80),
+        18.0: (29.56, 15.80),
+        20.0: (32.95, 18.00),
+        22.0: (37.29, 19.40),
+        24.0: (39.55, 21.50),
+        27.0: (45.20, 23.80),
+        30.0: (50.85, 25.60),
     }
 
     def __init__(
@@ -34,12 +49,12 @@ class Nut(object):
         self.diameter = float(diameter)
         if self.diameter not in self._config:
             raise Exception(f'Unknonw nut {self.diameter}')
-        (
-            self.internal_diameter,
-            self.external_diameter,
-            self.length,
-            self.width,
-        ) = self._config[self.diameter]
+        self.external_diameter, self.length = self._config[self.diameter]
+
+        # https://en.wikipedia.org/wiki/ISO_metric_screw_thread
+        pitch = thread.diameter_to_pitch(self.diameter)
+        self.internal_diameter = self.diameter - 1.082532 * pitch
+        self.width = self.external_diameter * sqrt(3) / 2
         self.clearance = clearance
 
     @property
@@ -88,6 +103,8 @@ class Screw(object):
             CapType.socket: (11, 6.0),
             CapType.flat: (12.0, 4.5),
         },
+        12.0: {},
+        14.0: {},
     }
 
     def __init__(
@@ -103,11 +120,16 @@ class Screw(object):
         if self.diameter not in self._config:
             raise Exception(f'Unknonw diameter {self.diameter}')
 
-        diameter_config = self._config[self.diameter]
-        if cap not in diameter_config:
-            raise Exception(f'Cap type {cap} for diameter {self.diameter} not found')
+        if cap == CapType.hex:
+            nut = Nut(diameter)
+            self.cap_diameter, self.cap_depth = nut.external_diameter, nut.length
+        else:
+            diameter_config = self._config[self.diameter]
+            if cap not in diameter_config:
+                raise Exception(f'Cap type {cap} for diameter {self.diameter} not found')
 
-        self.cap_diameter, self.cap_depth = diameter_config[cap]
+            self.cap_diameter, self.cap_depth = diameter_config[cap]
+
         self.cap_type = cap
         self.length = length
         self.clearance = clearance
