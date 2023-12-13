@@ -400,16 +400,15 @@ class BaseObject:
             **kwargs
         )
 
+    def rotate_extrude(self, angle: Optional[float] = None, **kwargs):
+        from yaost.transformation import RotateExtrude
+        kwargs = dict(kwargs)
+        if angle is not None:
+            kwargs['angle'] = angle
+        return RotateExtrude(self, **kwargs)
+
     def extrude(self, height: float, **kwargs):
         return self.linear_extrude(height, **kwargs)
-
-    def rotate_extrude(self, **kwargs):
-        from yaost.transformation import GenericSingleTransformation
-        return GenericSingleTransformation(
-            'rotate_extrude',
-            self,
-            **kwargs
-        )
 
     def offset(self, r=None, **kwargs):
         from yaost.transformation import GenericSingleTransformation

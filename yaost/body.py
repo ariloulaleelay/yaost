@@ -40,6 +40,10 @@ class Group(BaseBody):
     def to_scad(self) -> str:
         return self.child.to_scad()
 
+    @property
+    def is_2d(self):
+        return self.child.is_2d
+
 
 class Cube(BaseBody):
 
@@ -242,6 +246,9 @@ def cube(
     result.bbox = simple_cube.bbox
     result.is_body = True
     result.label = label
+    result.x = x
+    result.y = y
+    result.z = z
     return result
 
 
@@ -321,7 +328,9 @@ def polygon(points, paths=None, **kwargs):
         else:
             tmp.append(p)
     points = tmp
-    return GenericBody('polygon', points, **kwargs)
+    result = GenericBody('polygon', points, **kwargs)
+    result.is_2d = True
+    return result
 
 
 def polyhedron(points, faces=None, **kwargs):
@@ -331,11 +340,15 @@ def polyhedron(points, faces=None, **kwargs):
 
 
 def circle(*args, **kwargs):
-    return GenericBody('circle', *args, **kwargs)
+    result = GenericBody('circle', *args, **kwargs)
+    result.is_2d = True
+    return result
 
 
 def square(*args, **kwargs):
-    return GenericBody('square', *args, **kwargs)
+    result = GenericBody('square', *args, **kwargs)
+    result.is_2d = True
+    return result
 
 
 # def sector(d=None, d1=None, d2=None, h=None, a=None, fn=None):
