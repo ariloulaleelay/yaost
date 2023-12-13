@@ -6,22 +6,21 @@ Yaost - is python to openscad translator.
 
 ## Prerequisites
   - python >= 3.5
-  - openscad >= 2015
+  - openscad >= 2019
 
 ## Quickstart
 Create file example.py:
 
 ```python
 #!/usr/bin/env python
-from yaost import project
-from yaost import scad
+from yaost import project, cube
 
 p = Project('example project')
 
 @p.add_part
 def simple_cube():
-    return scad.cube(10, 10, 10)
-    
+    return cube(10, 10, 10)
+
 if __name__ == '__main__':
     p.run()
 ```
@@ -50,6 +49,6 @@ The open file with
 ```
 $ openscad scad/simple-cube.scad
 ```
-Chane something in example.py (eg. ```cube(30, 10, 10)```) you should see changes in openscad viewe immediately.
+Change something in example.py (eg. ```cube(30, 10, 10)```) you should see changes in openscad viewer immediately.
 
 See more in examples section.

@@ -8,42 +8,70 @@ import logging
 import json
 import uuid
 import hashlib
-from collections import defaultdict
+
 from .module_watcher import ModuleWatcher
 from .local_logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class Project(object):
+class Project:
     _single_run_guard = False
 
-    def __init__(self, name='Untitled', fa=3.0, fs=0.5, fn=None):
+    def __init__(
+        self,
+        name='Untitled',
+        fa=3.0,
+        fs=0.5,
+        fn=None,
+    ):
         self._fa = fa
         self._fs = fs
         self._fn = fn
         self.name = name
         self.parts = {}
 
+    def add_class(self, class_):
+        obj = class_()
+        for key in dir(class_):
+            value = getattr(class_, key, None)
+            if not getattr(value, '__yaost_part__', False):
+                continue
+            name = class_.__name__ + '.' + value.__name__
+            self.parts[name] = getattr(obj, key)
+        return class_
+
+    def part(self, method):
+        method.__yaost_part__ = True
+        return method
+
     def add_part(self, name_or_method, model=None):
         method = None
         try:
             if callable(name_or_method):
                 method = name_or_method
-                name_or_method = name_or_method.__name__.lower().replace('_', '-')
-                model = method()
-                if not model.kwargs.get('_label'):
-                    model = model.label(method.__name__)
-            self.parts[name_or_method] = model
+                name_or_method = method.__name__.replace('_', '-')
+            else:
+                def method_():
+                    return model
+                method = method_
+            self.parts[name_or_method] = method
         except:  # noqa
-            logger.exception("failed to add model")
+            logger.exception('failed to add model')
         return method
-
-    def get_part(self, name):
-        return self.parts[name]
 
     def build_stl(self, args):
         self.build(args, stl_only=True)
+
+    def iterate_parts(self):
+        for name in sorted(self.parts):
+            method = self.parts[name]
+            try:
+                model = method()
+            except: # noqa
+                logger.exception(f'failed to run model {name}')
+                continue
+            yield name, model
 
     def build(self, args, stl_only=False):
         self.build_scad(args)
@@ -54,8 +82,8 @@ class Project(object):
         if not os.path.exists(args.build_directory):
             os.makedirs(args.build_directory)
 
-        for name, model in self.parts.items():
-            scad_file_path = os.path.join(args.scad_directory, name + '.scad')
+        for name, model in self.iterate_parts():
+            scad_file_path = os.path.join(args.scad_directory, self.name, name + '.scad')
 
             extension = '.stl'
             if model.is_2d:
@@ -85,65 +113,47 @@ class Project(object):
         self._write_cache(args.cache_file, cache)
 
     def build_scad(self, args):
-        if not os.path.exists(args.scad_directory):
-            os.makedirs(args.scad_directory)
-
-        for name, model in self.parts.items():
-            logger.info('building %s.scad', name)
-            file_path = os.path.join(args.scad_directory, name + '.scad')
+        for name, model in self.iterate_parts():
+            file_path = os.path.join(args.scad_directory, self.name, name + '.scad')
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'w') as fp:
                 for key in ('fa', 'fs', 'fn'):
                     value = getattr(self, f'_{key}', None)
                     if value is not None:
-                        fp.write(f'${key}={value:.4f};\n')
-                cache = {}
-                reserved_names = defaultdict(int)
-                for node in model.traverse_children_deep_first():
-                    if node.id in cache or node.depth < 0 or len(node._children) < 2:
-                        continue
-                    node_string = node.to_string(cache=cache)
-                    name = node.kwargs.get('_label', node._name)
-                    if name in reserved_names:
-                        label = f'n_{name}_{reserved_names[name]}'
-                    else:
-                        label = f'n_{name}'
-                    reserved_names[name] += 1
-
-                    fp.write(f'module {label}(){{{node_string}}} // {node_id}\n')
-                    cache[node.id] = f'{label}();'
-                fp.write(model.to_string(cache=cache))
+                        fp.write(f'${key}={value:.6f};\n')
+                scad_code = model.to_scad()
+                fp.write(scad_code)
+                fp.write('\n')
+        logger.info('scad build done')
 
     def watch(self, args):
-        try:
-            import __main__
+        import __main__
 
-            def build_scad_generator(args, script_path):
-                def real_scad_generator(*args_array, **kwargs_hash):
-                    command_args = [
-                        __main__.__file__,
-                        '--scad-directory', args.scad_directory,
-                    ]
-                    if args.debug:
-                        command_args.append('--debug')
-                    command_args.append('build-scad')
-                    try:
-                        subprocess.call(command_args, shell=False)
-                    except OSError:
-                        time.sleep(0.1)
-                        subprocess.call(command_args, shell=False)
-
-                return real_scad_generator
-            callback = build_scad_generator(args, __main__.__file__)
-            mw = ModuleWatcher(__main__.__file__, callback)
-            try:
-                callback()
-                mw.start_watching()
-                while True:
+        def build_scad_generator(args, script_path):
+            def real_scad_generator(*args_array, **kwargs_hash):
+                command_args = [
+                    __main__.__file__,
+                    '--scad-directory', args.scad_directory,
+                ]
+                if args.debug:
+                    command_args.append('--debug')
+                command_args.append('build-scad')
+                try:
+                    subprocess.call(command_args, shell=False)
+                except OSError:
                     time.sleep(0.1)
-            finally:
-                mw.stop_watching()
-        except ImportError:
-            raise
+                    subprocess.call(command_args, shell=False)
+
+            return real_scad_generator
+        callback = build_scad_generator(args, __main__.__file__)
+        mw = ModuleWatcher(__main__.__file__, callback)
+        try:
+            callback()
+            mw.start_watching()
+            while True:
+                time.sleep(0.1)
+        finally:
+            mw.stop_watching()
 
     def _get_caller_module_name(self, depth=1):
         frm = inspect.stack()[depth + 1]
@@ -164,7 +174,7 @@ class Project(object):
 
     def _write_cache(self, cache_file, cache):
         try:
-            with open(cache_file, 'w') as fp:
+            with open(cache_file, 'w', encoding='utf-8') as fp:
                 json.dump(cache, fp, ensure_ascii=False)
         except:  # noqa
             logger.error('writing cache failed', exc_info=True)
@@ -176,12 +186,12 @@ class Project(object):
             h = hashlib.sha256()
             for filename in filenames:
                 h.update(b'\0\0\0\1\0\0')
-                with open(filename, "rb") as f:
-                    for chunk in iter(lambda: f.read(4096), b""):  # noqa
+                with open(filename, 'rb') as f:
+                    for chunk in iter(lambda: f.read(4096), b''):  # noqa
                         h.update(chunk)
             return h.hexdigest()
         except Exception as e:  # noqa
-            logger.error("hashing gone wrong %s %s", filename, e)
+            logger.error('hashing gone wrong %s %s', filename, e)
             return str(uuid.uuid4())
 
     def run(self):
@@ -190,12 +200,24 @@ class Project(object):
         Project._single_run_guard = True
 
         parser = argparse.ArgumentParser(sys.argv[0])
-        parser.add_argument('--scad-directory', type=str, help='directory to store .scad files', default='scad')
-        parser.add_argument('--stl-directory', type=str, help='directory to store .stl files', default='stl')
-        parser.add_argument('--build-directory', type=str, help='directory to store result files', default='build')
-        parser.add_argument('--cache-file', type=str, help='file to store some cahces', default='.yaost.cache')
-        parser.add_argument('--force', action='store_true', help='force action', default=False)
-        parser.add_argument('--debug', action='store_true', help='enable debug output', default=False)
+        parser.add_argument(
+            '--scad-directory', type=str, help='directory to store .scad files', default='scad'
+        )
+        parser.add_argument(
+            '--stl-directory', type=str, help='directory to store .stl files', default='stl'
+        )
+        parser.add_argument(
+            '--build-directory', type=str, help='directory to store result files', default='build'
+        )
+        parser.add_argument(
+            '--cache-file', type=str, help='file to store some cahces', default='.yaost.cache'
+        )
+        parser.add_argument(
+            '--force', action='store_true', help='force action', default=False
+        )
+        parser.add_argument(
+            '--debug', action='store_true', help='enable debug output', default=False
+        )
         parser.set_defaults(func=lambda args: parser.print_help())
         subparsers = parser.add_subparsers(help='sub command help')
 
@@ -216,5 +238,7 @@ class Project(object):
         loglevel = logging.INFO
         if args.debug:
             loglevel = logging.DEBUG
-        logging.basicConfig(level=loglevel, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        logging.basicConfig(
+            level=loglevel, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        )
         args.func(args)

@@ -6,12 +6,12 @@ from .packagefinder import PackageFinder
 
 
 class ModuleWatcher(pyinotify.ProcessEvent):
-    """
+    '''
     Automatically reload any modules or packages as they change
-    """
+    '''
 
     def __init__(self, script_path, callback=None):
-        "El constructor"
+        'El constructor'
 
         self.wm = pyinotify.WatchManager()
         self.notifier = None
@@ -30,20 +30,20 @@ class ModuleWatcher(pyinotify.ProcessEvent):
             self.wm.add_watch(dirname, pyinotify.ALL_EVENTS)
 
     def start_watching(self):
-        "Start the pyinotify watch thread"
+        'Start the pyinotify watch thread'
 
         if self.notifier is None:
             self.notifier = pyinotify.ThreadedNotifier(self.wm, self)
         self.notifier.start()
 
     def stop_watching(self):
-        "Stop the pyinotify watch thread"
+        'Stop the pyinotify watch thread'
 
         if self.notifier is not None:
             self.notifier.stop()
 
     def process_IN_MODIFY(self, event):
-        "A file of interest has changed"
+        'A file of interest has changed'
 
         # Is it a file I know about?
         if event.pathname not in self._files:

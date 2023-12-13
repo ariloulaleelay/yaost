@@ -3,7 +3,7 @@ from lazy import lazy
 from math import sin, cos, pi, sqrt, atan2
 
 
-class Vector(object):
+class Vector:
 
     def __init__(self, x=None, y=None, z=None):
         if isinstance(x, list) and len(x) == 3 and y is None and z is None:
@@ -205,5 +205,11 @@ class Vector(object):
     def __floordiv__(self, scale):
         return Vector(self.x // scale, self.y // scale, self.z // scale)
 
+    def __neg__(self):
+        return Vector(-self.x, -self.y, -self.z)
+
     def __str__(self):
-        return "Vector(%f, %f, %f)" % (self.x, self.y, self.z)
+        return f"Vector({self.x:f}, {self.y:f}, {self.z:f})"
+
+    def __bool__(self):
+        return bool(self.x or self.y or self.z)
