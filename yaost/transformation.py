@@ -477,8 +477,8 @@ class RotateExtrude(SingleChildTransformation):
 
     def __init__(
         self,
-        angle: float,
         child: BaseObject,
+        angle: Optional[float] = None,
         convexity: Optional[int] = None,
         fn: Optional[float] = None,
         label: Optional[str] = None,
