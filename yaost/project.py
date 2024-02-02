@@ -1,16 +1,18 @@
+import argparse
+import functools
+import hashlib
+import inspect
+import json
+import logging
 import os
+import subprocess
 import sys
 import time
-import inspect
-import argparse
-import subprocess
-import logging
-import json
 import uuid
-import hashlib
 
-from .module_watcher import ModuleWatcher
+from .base import BaseObject
 from .local_logging import get_logger
+from .module_watcher import ModuleWatcher
 
 logger = get_logger(__name__)
 
@@ -32,17 +34,38 @@ class Project:
         self.parts = {}
 
     def add_class(self, class_):
-        obj = class_()
-        for key in dir(class_):
-            value = getattr(class_, key, None)
-            if not getattr(value, '__yaost_part__', False):
-                continue
-            name = class_.__name__ + '.' + value.__name__
-            self.parts[name] = getattr(obj, key)
         return class_
 
+    def _get_class_that_defines_method(self, meth):
+        if isinstance(meth, functools.partial):
+            return self._get_class_that_defines_method(meth.func)
+
+        if inspect.ismethod(meth) or (
+            inspect.isbuiltin(meth)
+            and getattr(meth, '__self__', None) is not None
+            and getattr(meth.__self__, '__class__', None)
+        ):
+            for cls in inspect.getmro(meth.__self__.__class__):
+                if meth.__name__ in cls.__dict__:
+                    # NOTE we don't want to reconstruct class
+                    # if it was counstructed outside
+                    # return cls
+                    return None
+            meth = getattr(meth, '__func__', meth)
+
+        if inspect.isfunction(meth):
+            cls = getattr(
+                inspect.getmodule(meth),
+                meth.__qualname__.split('.<locals>', 1)[0].rsplit('.', 1)[0],
+                None,
+            )
+            if isinstance(cls, type):
+                return cls
+
+        return getattr(meth, '__objclass__', None)
+
     def part(self, method):
-        method.__yaost_part__ = True
+        self.parts[method.__qualname__] = method
         return method
 
     def add_part(self, name_or_method, model=None):
@@ -52,9 +75,12 @@ class Project:
                 method = name_or_method
                 name_or_method = method.__name__.replace('_', '-')
             else:
+
                 def method_():
                     return model
-                method = method_
+
+                # method = method_
+                method = model
             self.parts[name_or_method] = method
         except:  # noqa
             logger.exception('failed to add model')
@@ -65,13 +91,22 @@ class Project:
 
     def iterate_parts(self):
         for name in sorted(self.parts):
-            method = self.parts[name]
+            method_or_object = self.parts[name]
             try:
-                model = method()
-            except: # noqa
+                cls = self._get_class_that_defines_method(method_or_object)
+
+                if isinstance(method_or_object, BaseObject):
+                    yield name, method_or_object
+                elif cls is not None:
+                    obj = cls()
+                    model = method_or_object(obj)
+                else:
+                    model = method_or_object()
+
+                yield name, model
+            except:  # noqa
                 logger.exception(f'failed to run model {name}')
                 continue
-            yield name, model
 
     def build(self, args, stl_only=False):
         self.build_scad(args)
@@ -83,11 +118,13 @@ class Project:
             os.makedirs(args.build_directory)
 
         for name, model in self.iterate_parts():
-            scad_file_path = os.path.join(args.scad_directory, self.name, name + '.scad')
+            scad_file_path = os.path.join(
+                args.scad_directory, self.name, name + '.scad'
+            )
 
             extension = '.stl'
             if model.is_2d:
-                extension = '.dxf'
+                extension = '.svg'
                 if stl_only:
                     continue
             logger.info('building %s%s', name, extension)
@@ -105,7 +142,8 @@ class Project:
             command_args = [
                 'openscad',
                 scad_file_path,
-                '-o', result_file_path,
+                '-o',
+                result_file_path,
             ]
             subprocess.call(command_args, shell=False)
             hc = self._get_files_hash(scad_file_path, result_file_path)
@@ -133,7 +171,8 @@ class Project:
             def real_scad_generator(*args_array, **kwargs_hash):
                 command_args = [
                     __main__.__file__,
-                    '--scad-directory', args.scad_directory,
+                    '--scad-directory',
+                    args.scad_directory,
                 ]
                 if args.debug:
                     command_args.append('--debug')
@@ -145,6 +184,7 @@ class Project:
                     subprocess.call(command_args, shell=False)
 
             return real_scad_generator
+
         callback = build_scad_generator(args, __main__.__file__)
         mw = ModuleWatcher(__main__.__file__, callback)
         try:
@@ -201,16 +241,28 @@ class Project:
 
         parser = argparse.ArgumentParser(sys.argv[0])
         parser.add_argument(
-            '--scad-directory', type=str, help='directory to store .scad files', default='scad'
+            '--scad-directory',
+            type=str,
+            help='directory to store .scad files',
+            default='scad',
         )
         parser.add_argument(
-            '--stl-directory', type=str, help='directory to store .stl files', default='stl'
+            '--stl-directory',
+            type=str,
+            help='directory to store .stl files',
+            default='stl',
         )
         parser.add_argument(
-            '--build-directory', type=str, help='directory to store result files', default='build'
+            '--build-directory',
+            type=str,
+            help='directory to store result files',
+            default='build',
         )
         parser.add_argument(
-            '--cache-file', type=str, help='file to store some cahces', default='.yaost.cache'
+            '--cache-file',
+            type=str,
+            help='file to store some cahces',
+            default='.yaost.cache',
         )
         parser.add_argument(
             '--force', action='store_true', help='force action', default=False
@@ -221,13 +273,17 @@ class Project:
         parser.set_defaults(func=lambda args: parser.print_help())
         subparsers = parser.add_subparsers(help='sub command help')
 
-        watch_parser = subparsers.add_parser('watch', help='watch project and rebuild scad files')
+        watch_parser = subparsers.add_parser(
+            'watch', help='watch project and rebuild scad files'
+        )
         watch_parser.set_defaults(func=self.watch)
 
         build_scad_parser = subparsers.add_parser('build-scad', help='build scad files')
         build_scad_parser.set_defaults(func=self.build_scad)
 
-        build_stl_parser = subparsers.add_parser('build-stl', help='build scad and stl files')
+        build_stl_parser = subparsers.add_parser(
+            'build-stl', help='build scad and stl files'
+        )
         build_stl_parser.set_defaults(func=self.build_stl)
 
         build_parser = subparsers.add_parser('build', help='build all files')

@@ -1,18 +1,19 @@
-from typing import Optional, List
 from functools import reduce
+from typing import Iterable, Optional
 
 from lazy import lazy
 
 from yaost.base import BaseObject
 from yaost.bbox import BBox
-from yaost.vector import Vector
 from yaost.util import full_arguments_line
+from yaost.vector import Vector
 
 __all__ = [
-    'hull',
-    'union',
     'difference',
+    'hull',
     'intersection',
+    'minkowski',
+    'union',
 ]
 
 
@@ -21,15 +22,11 @@ class BaseTransformation(BaseObject):
 
 
 class SingleChildTransformation(BaseTransformation):
-    child = None
-
     def _clone_with_another_child(self, another_child: BaseObject):
         raise NotImplementedError
 
 
 class MultipleChildrenTransformation(BaseTransformation):
-    children = ()
-
     def _children_to_scad(self):
         if not self.children:
             result = ''
@@ -43,7 +40,6 @@ class MultipleChildrenTransformation(BaseTransformation):
 
 
 class Translate(SingleChildTransformation):
-
     def __init__(
         self,
         vector: Vector,
@@ -51,7 +47,7 @@ class Translate(SingleChildTransformation):
         clone: bool = False,
         label: Optional[str] = None,
     ):
-        self.label = label
+        self.label: Optional[str] = label
         self.child = child
         self._clone = clone
         self._vector = vector
@@ -99,7 +95,6 @@ class Translate(SingleChildTransformation):
 
 
 class Rotate(SingleChildTransformation):
-
     def __init__(
         self,
         vector: Vector,
@@ -115,14 +110,14 @@ class Rotate(SingleChildTransformation):
         self._vector = vector
 
     def _clone_with_another_child(self, another_child: BaseObject):
-        return self.__class__(self._vector, self._center, another_child, clone=self._clone)
+        return self.__class__(
+            self._vector, self._center, another_child, clone=self._clone
+        )
 
     @lazy
     def origin(self):
         result = (self.child.origin - self._center).rotate(
-            self._vector.x,
-            self._vector.y,
-            self._vector.z
+            self._vector.x, self._vector.y, self._vector.z
         ) + self._center
         if self._clone:
             result = (result + self.child.origin) / 2
@@ -152,9 +147,7 @@ class Rotate(SingleChildTransformation):
             translate1_str = 'translate({})'.format(
                 full_arguments_line([-self._center])
             )
-            translate2_str = 'translate({})'.format(
-                full_arguments_line([self._center])
-            )
+            translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
             result = f'{translate2_str}{rotate_str}{translate1_str}{child_str}'
         else:
             result = f'{rotate_str}{child_str}'
@@ -164,21 +157,19 @@ class Rotate(SingleChildTransformation):
 
 
 class Union(MultipleChildrenTransformation):
-
     def __init__(
         self,
-        children: List[BaseObject],
+        children: Iterable[BaseObject],
         label: Optional[str] = None,
     ):
+        children = list(children)
         # TODO calculate bbox properly
         self.bbox = BBox()
         self.label = label
         flat_children = self._get_flat_children(children)
-        self.origin = reduce(
-            lambda x, y: x + y.origin,
-            flat_children,
-            Vector()
-        ) / len(flat_children)
+        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(
+            flat_children
+        )
         self.children = flat_children
 
     @classmethod
@@ -196,22 +187,35 @@ class Union(MultipleChildrenTransformation):
         return 'union(){}'.format(self._children_to_scad())
 
 
-class Hull(MultipleChildrenTransformation):
-
+class Minkowski(MultipleChildrenTransformation):
     def __init__(
         self,
-        children: List[BaseObject],
+        children: Iterable[BaseObject],
         label: Optional[str] = None,
     ):
+        children = list(children)
+        self.bbox = BBox()
+        self.label = label
+        self.children = children
+
+    def to_scad(self):
+        return 'minkowski(){}'.format(self._children_to_scad())
+
+
+class Hull(MultipleChildrenTransformation):
+    def __init__(
+        self,
+        children: Iterable[BaseObject],
+        label: Optional[str] = None,
+    ):
+        children = list(children)
         # TODO calculate bbox properly
         self.bbox = BBox()
         self.label = label
         flat_children = self._get_flat_children(children)
-        self.origin = reduce(
-            lambda x, y: x + y.origin,
-            flat_children,
-            Vector()
-        ) / len(flat_children)
+        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(
+            flat_children
+        )
         self.children = flat_children
 
     @classmethod
@@ -230,22 +234,20 @@ class Hull(MultipleChildrenTransformation):
 
 
 class Intersection(MultipleChildrenTransformation):
-
     def __init__(
         self,
-        children: List[BaseObject],
+        children: Iterable[BaseObject],
         label: Optional[str] = None,
     ):
+        children = list(children)
         # TODO calculate bbox properly
         self.bbox = BBox()
         self.label = label
         flat_children = self._get_flat_children(children)
         # TODO calculate origin properly
-        self.origin = reduce(
-            lambda x, y: x + y.origin,
-            flat_children,
-            Vector()
-        ) / len(flat_children)
+        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(
+            flat_children
+        )
         self.children = children
 
     @classmethod
@@ -264,12 +266,12 @@ class Intersection(MultipleChildrenTransformation):
 
 
 class Difference(MultipleChildrenTransformation):
-
     def __init__(
         self,
-        children: List[BaseObject],
+        children: Iterable[BaseObject],
         label: Optional[str] = None,
     ):
+        children = list(children)
         assert len(children) >= 2
         # TODO calculate bbox properly
         self.bbox = children[0].bbox
@@ -301,7 +303,6 @@ class Difference(MultipleChildrenTransformation):
 
 
 class Mirror(SingleChildTransformation):
-
     def __init__(
         self,
         vector: Vector,
@@ -318,7 +319,9 @@ class Mirror(SingleChildTransformation):
         self._vector = vector
 
     def _clone_with_another_child(self, another_child: BaseObject):
-        return self.__class__(self._vector, self._center, another_child, clone=self._clone)
+        return self.__class__(
+            self._vector, self._center, another_child, clone=self._clone
+        )
 
     @lazy
     def origin(self):
@@ -355,9 +358,7 @@ class Mirror(SingleChildTransformation):
             translate1_str = 'translate({})'.format(
                 full_arguments_line([-self._center])
             )
-            translate2_str = 'translate({})'.format(
-                full_arguments_line([self._center])
-            )
+            translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
             result = f'{translate2_str}{mirror_str}{translate1_str}{child_str}'
         else:
             result = f'{mirror_str}{child_str}'
@@ -367,7 +368,6 @@ class Mirror(SingleChildTransformation):
 
 
 class Scale(SingleChildTransformation):
-
     def __init__(
         self,
         vector: Vector,
@@ -383,7 +383,9 @@ class Scale(SingleChildTransformation):
         self._vector = vector
 
     def _clone_with_another_child(self, another_child: BaseObject):
-        return self.__class__(self._vector, self._center, another_child, clone=self._clone)
+        return self.__class__(
+            self._vector, self._center, another_child, clone=self._clone
+        )
 
     @lazy
     def origin(self):
@@ -420,9 +422,7 @@ class Scale(SingleChildTransformation):
             translate1_str = 'translate({})'.format(
                 full_arguments_line([-self._center])
             )
-            translate2_str = 'translate({})'.format(
-                full_arguments_line([self._center])
-            )
+            translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
             result = f'{translate2_str}{transform_str}{translate1_str}{child_str}'
         else:
             result = f'{transform_str}{child_str}'
@@ -468,7 +468,7 @@ class LinearExtrude(SingleChildTransformation):
                     '$fn': self._fn,
                 },
             ),
-            self.child.to_scad()
+            self.child.to_scad(),
         )
 
 
@@ -507,7 +507,6 @@ class RotateExtrude(SingleChildTransformation):
 
 
 class GenericSingleTransformation(SingleChildTransformation):
-
     def __init__(
         self,
         name: str,
@@ -545,12 +544,11 @@ class GenericSingleTransformation(SingleChildTransformation):
                 self._args,
                 self._kwargs,
             ),
-            self.child.to_scad()
+            self.child.to_scad(),
         )
 
 
 class Modifier(SingleChildTransformation):
-
     def __init__(
         self,
         name: str,
@@ -570,10 +568,7 @@ class Modifier(SingleChildTransformation):
         return self.__class__(self._name, self.child)
 
     def to_scad(self):
-        return '{}{}'.format(
-            self._name,
-            self.child.to_scad()
-        )
+        return '{}{}'.format(self._name, self.child.to_scad())
 
 
 def difference(*args, label: Optional[str] = None):
@@ -584,9 +579,13 @@ def hull(*args, label: Optional[str] = None):
     return Hull(args, label=label)
 
 
-def union(*args, label: Optional[str] = None):
-    return Union(args, label=label)
-
-
 def intersection(*args, label: Optional[str] = None):
     return Intersection(args, label=label)
+
+
+def minkowski(*args, label: Optional[str] = None):
+    return Minkowski(args, label=label)
+
+
+def union(*args, label: Optional[str] = None):
+    return Union(args, label=label)

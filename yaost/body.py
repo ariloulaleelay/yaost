@@ -1,11 +1,11 @@
 from typing import Optional
+
 from lazy import lazy
 
-from yaost.vector import Vector
-from yaost.bbox import BBox
 from yaost.base import BaseObject
+from yaost.bbox import BBox
 from yaost.util import full_arguments_line
-
+from yaost.vector import Vector
 
 __all__ = [
     'cube',
@@ -26,7 +26,6 @@ class BaseBody(BaseObject):
 
 
 class Group(BaseBody):
-
     def __init__(
         self,
         child: BaseObject,
@@ -46,7 +45,6 @@ class Group(BaseBody):
 
 
 class Cube(BaseBody):
-
     def __init__(
         self,
         x: float = 0,
@@ -62,13 +60,10 @@ class Cube(BaseBody):
         self.label = label
 
     def to_scad(self):
-        return 'cube({});'.format(
-            full_arguments_line([[self.x, self.y, self.z]])
-        )
+        return 'cube({});'.format(full_arguments_line([[self.x, self.y, self.z]]))
 
 
 class Cylinder(BaseBody):
-
     def __init__(
         self,
         h: float = 0,
@@ -178,13 +173,12 @@ class Cylinder(BaseBody):
                     'd2': self._d2,
                     'h': self._h,
                     '$fn': self._fn,
-                }
+                },
             )
         )
 
 
 class GenericBody(BaseBody):
-
     def __init__(
         self,
         name: str,
@@ -233,15 +227,16 @@ def cube(
         h=z,
         chamfer_top=chamfer_top,
         chamfer_bottom=chamfer_bottom,
-    ).t(
-        r, r
+    ).t(r, r)
+    result = Hull(
+        [
+            pillar,
+            pillar.t(x - 2 * r),
+            pillar.t(x - 2 * r, y - 2 * r),
+            pillar.t(0, y - 2 * r),
+        ]
     )
-    result = Hull([
-        pillar,
-        pillar.t(x - 2 * r),
-        pillar.t(x - 2 * r, y - 2 * r),
-        pillar.t(0, y - 2 * r),
-    ]).hull()
+
     result.origin = simple_cube.origin
     result.bbox = simple_cube.bbox
     result.is_body = True
@@ -286,25 +281,19 @@ def cylinder(
         bottom = Cylinder(
             d1=simple_cylinder.d1 - chamfer_bottom * 2,
             d2=simple_cylinder.d1,
-            h=chamfer_bottom
+            h=chamfer_bottom,
         )
     else:
-        bottom = Cylinder(
-            d=simple_cylinder.d1,
-            h=0.0001
-        )
+        bottom = Cylinder(d=simple_cylinder.d1, h=0.0001)
 
     if chamfer_top:
         top = Cylinder(
             d1=simple_cylinder.d2,
             d2=simple_cylinder.d2 - chamfer_top * 2,
-            h=chamfer_top
+            h=chamfer_top,
         ).tz(h - chamfer_top)
     else:
-        top = Cylinder(
-            d=simple_cylinder.d1,
-            h=0.0001
-        ).tz(h - 0.0001)
+        top = Cylinder(d=simple_cylinder.d1, h=0.0001).tz(h - 0.0001)
 
     result = Hull([top, bottom])
 
@@ -314,8 +303,37 @@ def cylinder(
     return result
 
 
-def sphere(*args, **kwargs):
-    return GenericBody('sphere', *args, **kwargs)
+def sphere(
+    d: Optional[float] = None,
+    r: Optional[float] = None,
+    fn: Optional[float] = None,
+    label: Optional[str] = None,
+):
+    kwargs = {}
+    if d is not None:
+        kwargs['d'] = d
+        r = d / 2
+    elif r is not None:
+        kwargs['r'] = r
+        d = r * 2
+    else:
+        raise RuntimeError('Please provide d or r for shpere')
+
+    if fn is not None:
+        kwargs['fn'] = fn
+
+    if label is not None:
+        kwargs['label'] = label
+
+    result = GenericBody('sphere', **kwargs)
+    result.origin = Vector()
+    result.r = r
+    result.d = d
+    result.bbox = BBox(
+        Vector(-r, -r, -r),
+        Vector(r, r, r),
+    )
+    return result
 
 
 def polygon(points, paths=None, **kwargs):

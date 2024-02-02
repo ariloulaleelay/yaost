@@ -1,7 +1,8 @@
 from enum import Enum
 from math import sqrt
+from typing import Optional, Tuple
 
-from yaost import cylinder, hull
+from yaost import context, cube, cylinder, hull
 from yaost.ext import thread
 
 inf = 1000
@@ -21,7 +22,6 @@ class CapType(Enum):
 
 
 class Nut(object):
-
     _config = {
         2.5: (5.45, 2.0),
         3.0: (6.01, 2.40),
@@ -82,7 +82,6 @@ class Nut(object):
 
 
 class Screw(object):
-
     _config = {
         2.5: {
             CapType.socket: (4.5, 2.5),
@@ -116,6 +115,7 @@ class Screw(object):
         cap_clearance: float = 0,
         nut_clearance: float = 0,
     ):
+        self.cap_depth: float
         self.diameter = float(diameter)
         if self.diameter not in self._config:
             raise Exception(f'Unknonw diameter {self.diameter}')
@@ -126,7 +126,9 @@ class Screw(object):
         else:
             diameter_config = self._config[self.diameter]
             if cap not in diameter_config:
-                raise Exception(f'Cap type {cap} for diameter {self.diameter} not found')
+                raise Exception(
+                    f'Cap type {cap} for diameter {self.diameter} not found'
+                )
 
             self.cap_diameter, self.cap_depth = diameter_config[cap]
 
@@ -143,16 +145,19 @@ class Screw(object):
     def hole(  # noqa
         self,
         no_cap: bool = False,
-        length: float = None,
-        clearance: float = None,
-        cap_clearance: float = None,
+        length: Optional[float] = None,
+        clearance: Optional[float] = None,
+        cap_clearance: Optional[float] = None,
         cap_cone: bool = False,
-        nut_clearance: bool = None,
+        cap_overhang: bool = False,
+        nut_clearance: Optional[float] = None,
         inf_cap: bool = False,
         sacrificial: float = 0,
+        layer_height: float = 0.2,
         z_align: str = 'root',
         nut: bool = False,
         nut_cone: bool = False,
+        screwdriver: Optional[Tuple[float, float]] = None,
     ):
         if length is None:
             length = self.length
@@ -167,14 +172,11 @@ class Screw(object):
             nut_clearance = self.nut_clearance
 
         if inf_cap:
-            cap_depth = inf
+            cap_depth = float(inf)
         else:
             cap_depth = self.cap_depth
 
-        body = cylinder(
-            d=self.diameter + clearance,
-            h=length + tol * 2
-        )
+        body = cylinder(d=self.diameter + clearance, h=length + tol * 2)
 
         if sacrificial:
             body = body.tz(sacrificial)
@@ -191,48 +193,61 @@ class Screw(object):
                 cap = cylinder(
                     d1=self.diameter + clearance,
                     d2=self.cap_diameter,
-                    h=self.cap_depth + tol
+                    h=self.cap_depth + tol,
                 ).mz()
                 if inf_cap:
-                    cap = hull(
-                        cap,
-                        cylinder(
-                            d=self.cap_diameter, h=tol
-                        ).tz(-inf - tol)
-                    )
+                    cap = hull(cap, cylinder(d=self.cap_diameter, h=tol).tz(-inf - tol))
             else:
                 raise Exception(f'cap of type {self.cap_type} not supported yet')
 
-            if cap_cone:
+            if cap_overhang:
+                cutter = (
+                    cube(
+                        self.cap_diameter + cap_clearance + tol * 2,
+                        (
+                            self.cap_diameter
+                            + cap_clearance
+                            - (self.diameter + clearance)
+                        )
+                        / 2
+                        + tol,
+                        layer_height * 2 * 2 + tol,
+                    )
+                    .t(
+                        'c',
+                        (self.diameter + clearance) / 2,
+                    )
+                    .my(clone=True)
+                )
+
+                cap = cap.tz(layer_height * 2)
+                cap -= cutter
+                cap -= cutter.rz(90).tz(-layer_height)
+            elif cap_cone:
                 d1 = self.cap_diameter + cap_clearance
                 d2 = self.diameter + clearance
-                cap += cylinder(
-                    d1=d1,
-                    d2=d2,
-                    h=(d1 - d2) / 2 + tol
-                ).tz(-tol)
+                cap += cylinder(d1=d1, d2=d2, h=(d1 - d2) / 2 + tol).tz(-tol)
+
+            if screwdriver is not None:
+                screwdriver_length, screwdriver_diameter = screwdriver
+                cap += cylinder(d=screwdriver_diameter, h=inf).tz(
+                    -context.body.h - screwdriver_length
+                )
 
         result = body
         if cap is not None:
             result += cap
 
         if nut:
-            nut = cylinder(
-                d=self.nut.external_diameter + nut_clearance,
-                h=inf,
-                fn=6
-            ).tz(
-                length - self.nut.height
-            )
+            nut_model = cylinder(
+                d=self.nut.external_diameter + nut_clearance, h=inf, fn=6
+            ).tz(length - self.nut.height)
             if nut_cone:
-                nut += cylinder(
-                    d=self.diameter + clearance,
-                    h=tol
-                ).tz(
-                   length - self.nut.height - self.diameter
+                nut_model += cylinder(d=self.diameter + clearance, h=tol).tz(
+                    length - self.nut.height - self.diameter
                 )
-                nut = nut.hull()
-            result += nut
+                nut_model = nut_model.hull()
+            result += nut_model
 
         if z_align == 'cap':
             result = result.tz(self.cap_depth)

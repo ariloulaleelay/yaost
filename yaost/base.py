@@ -1,11 +1,12 @@
 # coding: utf-8
 import logging
-from typing import Optional, Union as TUnion
+from typing import Optional
+from typing import Union as TUnion
 
 import yaost.context as ctx
-from yaost.vector import Vector
-from yaost.context import Operation
 from yaost.bbox import BBox
+from yaost.context import Operation
+from yaost.vector import Vector
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +14,8 @@ logger = logging.getLogger(__name__)
 class BaseObject:
     origin = Vector()
     bbox = BBox()
-    label = None
-    is_body = False
+    label: Optional[str] = None
+    is_body: bool = False
     is_2d = False
 
     def to_scad(self):
@@ -22,8 +23,8 @@ class BaseObject:
 
     def traverse_all(self):
         from yaost.transformation import (
-            SingleChildTransformation,
             MultipleChildrenTransformation,
+            SingleChildTransformation,
         )
 
         if isinstance(self, MultipleChildrenTransformation):
@@ -37,9 +38,10 @@ class BaseObject:
 
     def _get_body_stack(self, label: Optional[str] = None):
         from yaost.transformation import (
-            SingleChildTransformation,
             MultipleChildrenTransformation,
+            SingleChildTransformation,
         )
+
         if self.is_body and (label is None or label == self.label):
             return [self]
 
@@ -61,6 +63,7 @@ class BaseObject:
         label: Optional[str] = None,
     ) -> 'BaseObject':
         from yaost.transformation import SingleChildTransformation
+
         result = self
 
         if isinstance(obj_or_label, str):
@@ -81,7 +84,7 @@ class BaseObject:
     def _eval_operation(
         self,
         value: Optional[TUnion[float, Vector, Operation]],
-        axis: Optional[str] = None
+        axis: Optional[str] = None,
     ):
         if value == 'c':
             value = ctx.center
@@ -93,6 +96,7 @@ class BaseObject:
     def group(self, label: Optional[str] = None) -> 'BaseObject':
         '''Group elements. Interpret as single body.'''
         from yaost.body import Group
+
         return Group(self, label=label)
 
     def l(self, key: str):
@@ -115,6 +119,7 @@ class BaseObject:
         label: Optional[str] = None,
     ) -> 'BaseObject':
         from yaost.transformation import Translate
+
         x = self._eval_operation(x, 'x')
         y = self._eval_operation(y, 'y')
         z = self._eval_operation(z, 'z')
@@ -137,6 +142,7 @@ class BaseObject:
         label: Optional[str] = None,
     ) -> 'BaseObject':
         from yaost.transformation import Translate
+
         v = self._eval_operation(v)
         if not v:
             return self
@@ -195,11 +201,7 @@ class BaseObject:
             return self
 
         result = Rotate(
-            Vector(x, y, z),
-            Vector(xc, yc, zc),
-            self,
-            clone=clone,
-            label=label
+            Vector(x, y, z), Vector(xc, yc, zc), self, clone=clone, label=label
         )
         return result
 
@@ -382,26 +384,27 @@ class BaseObject:
 
     def union(self, other: 'BaseObject', label: Optional[str] = None):
         from yaost.transformation import Union
+
         return Union([self, other], label=label)
 
     def difference(self, other: 'BaseObject', label: Optional[str] = None):
         from yaost.transformation import Difference
+
         return Difference([self, other], label=label)
 
     def intersection(self, other: 'BaseObject', label: Optional[str] = None):
         from yaost.transformation import Intersection
+
         return Intersection([self, other], label=label)
 
     def linear_extrude(self, height: float, **kwargs):
         from yaost.transformation import LinearExtrude
-        return LinearExtrude(
-            height,
-            self,
-            **kwargs
-        )
+
+        return LinearExtrude(height, self, **kwargs)
 
     def rotate_extrude(self, angle: Optional[float] = None, **kwargs):
         from yaost.transformation import RotateExtrude
+
         kwargs = dict(kwargs)
         if angle is not None:
             kwargs['angle'] = angle
@@ -412,75 +415,47 @@ class BaseObject:
 
     def offset(self, r=None, **kwargs):
         from yaost.transformation import GenericSingleTransformation
+
         if r is not None:
             kwargs['r'] = r
-        return GenericSingleTransformation(
-            'offset',
-            self,
-            **kwargs
-        )
+        return GenericSingleTransformation('offset', self, **kwargs)
 
     def render(self, **kwargs):
         from yaost.transformation import GenericSingleTransformation
-        return GenericSingleTransformation(
-            'render',
-            self,
-            **kwargs
-        )
+
+        return GenericSingleTransformation('render', self, **kwargs)
 
     def projection(self, **kwargs):
         from yaost.transformation import GenericSingleTransformation
-        return GenericSingleTransformation(
-            'projection',
-            self,
-            **kwargs
-        )
+
+        return GenericSingleTransformation('projection', self, **kwargs)
 
     def hull(self, **kwargs):
-        from yaost.transformation import GenericSingleTransformation
-        return GenericSingleTransformation(
-            'hull',
-            self,
-            **kwargs
-        )
+        from yaost.transformation import Hull
+
+        return Hull([self], **kwargs)
 
     def color(self, *args, **kwargs):
         from yaost.transformation import GenericSingleTransformation
-        return GenericSingleTransformation(
-            'color',
-            self,
-            *args,
-            **kwargs
-        )
+
+        return GenericSingleTransformation('color', self, *args, **kwargs)
 
     def debug(self, label: Optional[str] = None):
         from yaost.transformation import Modifier
-        return Modifier(
-            '#',
-            self,
-            label=label
-        )
+
+        return Modifier('#', self, label=label)
 
     def background(self, label: Optional[str] = None):
         from yaost.transformation import Modifier
-        return Modifier(
-            '%',
-            self,
-            label=label
-        )
+
+        return Modifier('%', self, label=label)
 
     def show_only(self, label: Optional[str] = None):
         from yaost.transformation import Modifier
-        return Modifier(
-            '!',
-            self,
-            label=label
-        )
+
+        return Modifier('!', self, label=label)
 
     def disable(self, label: Optional[str] = None):
         from yaost.transformation import Modifier
-        return Modifier(
-            '*',
-            self,
-            label=label
-        )
+
+        return Modifier('*', self, label=label)

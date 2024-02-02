@@ -1,21 +1,17 @@
 # coding: utf-8
-import copy
-import hashlib
-import logging
-from typing import Optional, List
-from lazy import lazy
+from typing import Iterable
 
 
 class Operation(object):
-
     def __call__(self, node, **kwargs):
-        raise NotImplemented
+        raise NotImplementedError
 
     def _find_body(self, node):
         from yaost.transformation import (
-            SingleChildTransformation,
             MultipleChildrenTransformation,
+            SingleChildTransformation,
         )
+
         if node.is_body:
             return node
 
@@ -30,9 +26,10 @@ class Operation(object):
 
     def _find_first(self, node, callback):
         from yaost.transformation import (
-            SingleChildTransformation,
             MultipleChildrenTransformation,
+            SingleChildTransformation,
         )
+
         result = callback(node)
         if result is not None:
             return result
@@ -76,12 +73,8 @@ class Operation(object):
     def __floordiv__(self, other):
         return BinaryOperation(self, other, operator=lambda x, y: x // y)
 
-    def __floordiv__(self, other):
-        return BinaryOperation(other, self, operator=lambda x, y: x / y)
-
 
 class ConstOperation(Operation):
-
     def __init__(self, value):
         self._value = value
 
@@ -90,7 +83,6 @@ class ConstOperation(Operation):
 
 
 class BinaryOperation(Operation):
-
     def __init__(self, left, right, operator):
         if not isinstance(left, Operation):
             left = ConstOperation(left)
@@ -105,7 +97,6 @@ class BinaryOperation(Operation):
 
 
 class UnaryOperation(Operation):
-
     def __init__(self, operand, operator):
         if isinstance(operand, Operation):
             self._operand = operand
@@ -118,7 +109,6 @@ class UnaryOperation(Operation):
 
 
 class NodeByLabel(Operation):
-
     def __init__(self, path=None):
         self._path = []
         if path is not None:
@@ -147,10 +137,8 @@ class NodeByLabel(Operation):
         return self.__class__(self._path + [key])
 
 
-
 class BodyContext(Operation):
-
-    def __init__(self, path: List[str] = ()):
+    def __init__(self, path: Iterable[str] = ()):
         self._path = list(path)
 
     def __call__(self, obj, **kwargs):
@@ -169,15 +157,14 @@ class BodyContext(Operation):
 
 
 class CenterContext(Operation):
-
-    def __call__(self, obj, axis: str = None, **kwargs):
-        if axis not in ('xyz'):
+    def __call__(self, obj, **kwargs):
+        axis = kwargs.get('axis')
+        if axis is None or axis not in ('xyz'):
             raise RuntimeError(f'Wrong axis `{axis}`')
         return -getattr(obj.origin, axis)
 
 
 class Inspector:
-
     def __init__(self, obj: 'BaseObject'):
         self._obj = obj
 
@@ -191,9 +178,10 @@ class Inspector:
 
     def _find_first(self, obj, filter_function):
         from yaost.transformation import (
-            SingleChildTransformation,
             MultipleChildrenTransformation,
+            SingleChildTransformation,
         )
+
         if filter_function(obj):
             return obj
 
@@ -208,7 +196,6 @@ class Inspector:
 
 
 class QProxy:
-
     def __init__(self, obj: 'BaseObject'):
         self._obj = obj
 
