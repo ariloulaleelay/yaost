@@ -63,8 +63,8 @@ class Nut(object):
 
     @property
     def model(self):
-        result = cylinder(d=self.external_diameter, h=self.height, fn=6)
-        result -= cylinder(d=self.internal_diameter, h=self.height + tol * 2).tz(-tol)
+        result = cylinder(d=self.external_diameter, h=self.length, fn=6)
+        result -= cylinder(d=self.internal_diameter, h=self.length + tol * 2).tz(-tol)
         return result
 
     def hole(self, length=inf, clearance=None):
@@ -102,6 +102,8 @@ class Screw(object):
             CapType.socket: (11, 6.0),
             CapType.flat: (12.0, 4.5),
         },
+        8.0: {},
+        10.0: {},
         12.0: {},
         14.0: {},
     }
@@ -220,9 +222,11 @@ class Screw(object):
                     .my(clone=True)
                 )
 
-                cap = cap.tz(layer_height * 2)
+                cap = cap.tz(layer_height)
                 cap -= cutter
-                cap -= cutter.rz(90).tz(-layer_height)
+                cap = cap.tz(layer_height)
+                cap -= cutter.rz(90)
+
             elif cap_cone:
                 d1 = self.cap_diameter + cap_clearance
                 d2 = self.diameter + clearance

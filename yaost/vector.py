@@ -1,10 +1,10 @@
 # coding: utf-8
+from math import atan2, cos, pi, sin, sqrt
+
 from lazy import lazy
-from math import sin, cos, pi, sqrt, atan2
 
 
 class Vector:
-
     def __init__(self, x=None, y=None, z=None):
         if isinstance(x, list) and len(x) == 3 and y is None and z is None:
             x, y, z = x[0], x[1], x[2]
@@ -26,11 +26,7 @@ class Vector:
     def com_for_linear_extrude(cls, children, *args, **kwargs):
         result = cls.com_for_children(children)
         height = kwargs.get('h', args[0])
-        return Vector(
-            result.x,
-            result.y,
-            result.z + height / 2
-        )
+        return Vector(result.x, result.y, result.z + height / 2)
 
     @classmethod
     def com_for_cube(self, children, *args, **kwargs):
@@ -185,8 +181,7 @@ class Vector:
 
         new_length = v1.dot(v2) / v1.norm
         result = Vector(
-            pl.x + new_length * v1.x / v1.norm,
-            pl.y + new_length * v1.y / v1.norm
+            pl.x + new_length * v1.x / v1.norm, pl.y + new_length * v1.y / v1.norm
         )
         return result
 

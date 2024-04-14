@@ -3,8 +3,8 @@
 from math import acos, pi, sqrt
 
 from yaost.body import GenericBody
-from yaost.vector import Vector
 from yaost.local_logging import get_logger
+from yaost.vector import Vector
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,6 @@ def line_intersection(a, b, c, d):
 
 
 class Path(object):
-
     def __init__(self, points):
         self.points = []
         for p in points:
@@ -50,7 +49,8 @@ class Path(object):
 
     def polygon(self, convexity=2):
         return GenericBody(
-            'polygon', [p.as_array_2d for p in self.points],
+            'polygon',
+            [p.as_array_2d for p in self.points],
             convexity=convexity,
         )
 
@@ -71,7 +71,7 @@ class Path(object):
             if is_convex == (r < 0):
                 b = ((p - c).normed + (n - c).normed).normed
                 bcos = (n - c).normed.dot(b)
-                bsin = sqrt(1 - bcos ** 2)
+                bsin = sqrt(1 - bcos**2)
                 b = b * r / bsin
                 result.append(b + c)
             else:
@@ -86,9 +86,7 @@ class Path(object):
                 angle = acos(cos_phi)
                 for i in range(fn + 1):
                     alpha = float(i) / fn
-                    result.append(
-                        (n_prime - c).rz(alpha * angle * 180 / pi) + c
-                    )
+                    result.append((n_prime - c).rz(alpha * angle * 180 / pi) + c)
         return Path(result)
 
     def round_corners(self, r=0, fn=16):
@@ -103,7 +101,7 @@ class Path(object):
 
             bisect = ((p - c).normed + (n - c).normed).normed
             bcos = (n - c).normed.dot(bisect)
-            bsin = sqrt(1 - bcos ** 2)
+            bsin = sqrt(1 - bcos**2)
             bisect = bisect * r / bsin
 
             center = c + bisect
@@ -140,6 +138,9 @@ class Path(object):
     def rotate(self, ax=0, ay=0, az=0):
         return Path([p.rotate(ax, ay, az) for p in self.points])
 
+    def scale(self, x=1.0, y=1.0, z=1.0):
+        return Path([p.scale(x, y, z) for p in self.points])
+
 
 def stitch_slices(slices, convexity=10):
     slice_count = len(slices)
@@ -163,24 +164,30 @@ def stitch_slices(slices, convexity=10):
 
     for i in range(points_per_slice):
         faces.append([z0idx, (i + 1) % points_per_slice, i])
-        faces.append([
-            z1idx,
-            points_per_slice * (slice_count - 1) + ((i - 1) % points_per_slice),
-            points_per_slice * (slice_count - 1) + i,
-        ])
+        faces.append(
+            [
+                z1idx,
+                points_per_slice * (slice_count - 1) + ((i - 1) % points_per_slice),
+                points_per_slice * (slice_count - 1) + i,
+            ]
+        )
 
     for layer in range(slice_count - 1):
         for i in range(points_per_slice):
-            faces.append([
-                points_per_slice * layer + i,
-                points_per_slice * layer + (i + 1) % points_per_slice,
-                points_per_slice * (layer + 1) + i,
-            ])
-            faces.append([
-                points_per_slice * (layer + 1) + i,
-                points_per_slice * layer + (i + 1) % points_per_slice,
-                points_per_slice * (layer + 1) + (i + 1) % points_per_slice,
-            ])
+            faces.append(
+                [
+                    points_per_slice * layer + i,
+                    points_per_slice * layer + (i + 1) % points_per_slice,
+                    points_per_slice * (layer + 1) + i,
+                ]
+            )
+            faces.append(
+                [
+                    points_per_slice * (layer + 1) + i,
+                    points_per_slice * layer + (i + 1) % points_per_slice,
+                    points_per_slice * (layer + 1) + (i + 1) % points_per_slice,
+                ]
+            )
 
     return GenericBody('polyhedron', points=points, faces=faces, convexity=convexity)
 
