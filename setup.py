@@ -23,9 +23,7 @@ class PyTest(TestCommand):
 
 
 # TODO use setuptools utils
-install_requires = (
-    open(os.path.join(BASE_DIR, 'requirements.txt'), 'r').read().splitlines()
-)
+install_requires = open(os.path.join(BASE_DIR, 'requirements.txt'), 'r').read().splitlines()
 
 with open(os.path.join(BASE_DIR, 'README.md'), 'r') as fh:
     long_description = fh.read()
@@ -36,7 +34,7 @@ setup_requires = install_requires + []
 
 setup(
     name='yaost',
-    version='2.0.5',
+    version='2.0.6',
     author='Andrey Proskurnev',
     author_email='andrey@proskurnev.ru',
     packages=find_packages(exclude=['tests']),
