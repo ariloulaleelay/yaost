@@ -74,6 +74,8 @@ class Vector:
         return cls.com_for_children(children)
 
     def translate(self, x, y, z):
+        if x == 0 and y == 0 and z == 0:
+            return self
         return Vector(self.x + x, self.y + y, self.z + z)
 
     def scale(self, x, y, z):
@@ -86,14 +88,23 @@ class Vector:
             self.z * (-1 if z else 1),
         )
 
-    def mx(self):
-        return self.mirror(1, 0, 0)
+    def mx(self, xc: float = 0):
+        if xc == 0:
+            return self.scale(-1, 1, 1)
+        else:
+            return self.tx(-xc).scale(-1, 1, 1).tx(xc)
 
-    def my(self):
-        return self.mirror(0, 1, 0)
+    def my(self, yc: float = 0):
+        if yc == 0:
+            return self.scale(1, -1, 1)
+        else:
+            return self.ty(-yc).scale(1, -1, 1).ty(yc)
 
-    def mz(self):
-        return self.mirror(0, 0, 1)
+    def mz(self, zc: float = 0):
+        if zc == 0:
+            return self.scale(1, 1, -1)
+        else:
+            return self.tz(-zc).scale(1, 1, -1).ty(zc)
 
     def rotate(self, ax=0, ay=0, az=0):
         a_sin = sin(ax * pi / 180)
@@ -121,8 +132,11 @@ class Vector:
     def ry(self, ay):
         return self.rotate(ay=ay)
 
-    def rz(self, az):
-        return self.rotate(az=az)
+    def rz(self, az: float, xc: float = 0, yc: float = 0):
+        if xc == 0 and yc == 0:
+            return self.rotate(az=az)
+        else:
+            return self.t(-xc, -yc, 0).rotate(az=az).t(xc, yc, 0)
 
     @lazy
     def norm(self):
@@ -180,9 +194,7 @@ class Vector:
             return self
 
         new_length = v1.dot(v2) / v1.norm
-        result = Vector(
-            pl.x + new_length * v1.x / v1.norm, pl.y + new_length * v1.y / v1.norm
-        )
+        result = Vector(pl.x + new_length * v1.x / v1.norm, pl.y + new_length * v1.y / v1.norm)
         return result
 
     def __sub__(a, b):

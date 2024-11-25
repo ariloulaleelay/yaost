@@ -200,9 +200,7 @@ class BaseObject:
         if not x and not y and not z and not label:
             return self
 
-        result = Rotate(
-            Vector(x, y, z), Vector(xc, yc, zc), self, clone=clone, label=label
-        )
+        result = Rotate(Vector(x, y, z), Vector(xc, yc, zc), self, clone=clone, label=label)
         return result
 
     def m(

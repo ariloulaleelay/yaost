@@ -1,4 +1,5 @@
 import argparse
+import fnmatch
 import functools
 import hashlib
 import inspect
@@ -34,6 +35,16 @@ class Project:
         self.parts = {}
 
     def add_class(self, class_):
+        instance = None
+        for key in dir(class_):
+            if key.startswith('_'):
+                continue
+            value = getattr(class_, key)
+            if not hasattr(value, '__yaost_part__'):
+                continue
+            if instance is None:
+                instance = class_()
+            self.add_part(f'{class_.__name__}.{key}', getattr(instance, key))
         return class_
 
     def _get_class_that_defines_method(self, meth):
@@ -66,6 +77,7 @@ class Project:
 
     def part(self, method):
         self.parts[method.__qualname__] = method
+        method.__yaost_part__ = True
         return method
 
     def add_part(self, name_or_method, model=None):
@@ -118,9 +130,10 @@ class Project:
             os.makedirs(args.build_directory)
 
         for name, model in self.iterate_parts():
-            scad_file_path = os.path.join(
-                args.scad_directory, self.name, name + '.scad'
-            )
+            if args.include and not fnmatch.fnmatch(name, args.include):
+                continue
+
+            scad_file_path = os.path.join(args.scad_directory, self.name, name + '.scad')
 
             extension = '.stl'
             if model.is_2d:
@@ -148,7 +161,7 @@ class Project:
             subprocess.call(command_args, shell=False)
             hc = self._get_files_hash(scad_file_path, result_file_path)
             cache['scad_cache'][scad_file_path] = hc
-        self._write_cache(args.cache_file, cache)
+            self._write_cache(args.cache_file, cache)
 
     def build_scad(self, args):
         for name, model in self.iterate_parts():
@@ -264,29 +277,22 @@ class Project:
             help='file to store some cahces',
             default='.yaost.cache',
         )
-        parser.add_argument(
-            '--force', action='store_true', help='force action', default=False
-        )
-        parser.add_argument(
-            '--debug', action='store_true', help='enable debug output', default=False
-        )
+        parser.add_argument('--force', action='store_true', help='force action', default=False)
+        parser.add_argument('--debug', action='store_true', help='enable debug output', default=False)
         parser.set_defaults(func=lambda args: parser.print_help())
         subparsers = parser.add_subparsers(help='sub command help')
 
-        watch_parser = subparsers.add_parser(
-            'watch', help='watch project and rebuild scad files'
-        )
+        watch_parser = subparsers.add_parser('watch', help='watch project and rebuild scad files')
         watch_parser.set_defaults(func=self.watch)
 
         build_scad_parser = subparsers.add_parser('build-scad', help='build scad files')
         build_scad_parser.set_defaults(func=self.build_scad)
 
-        build_stl_parser = subparsers.add_parser(
-            'build-stl', help='build scad and stl files'
-        )
+        build_stl_parser = subparsers.add_parser('build-stl', help='build scad and stl files')
         build_stl_parser.set_defaults(func=self.build_stl)
 
         build_parser = subparsers.add_parser('build', help='build all files')
+        build_parser.add_argument('--include', type=str, help='regex to build specified models only', default='')
         build_parser.set_defaults(func=self.build)
 
         args = parser.parse_args()
@@ -294,7 +300,5 @@ class Project:
         loglevel = logging.INFO
         if args.debug:
             loglevel = logging.DEBUG
-        logging.basicConfig(
-            level=loglevel, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-        )
+        logging.basicConfig(level=loglevel, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
         args.func(args)

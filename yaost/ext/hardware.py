@@ -128,9 +128,7 @@ class Screw(object):
         else:
             diameter_config = self._config[self.diameter]
             if cap not in diameter_config:
-                raise Exception(
-                    f'Cap type {cap} for diameter {self.diameter} not found'
-                )
+                raise Exception(f'Cap type {cap} for diameter {self.diameter} not found')
 
             self.cap_diameter, self.cap_depth = diameter_config[cap]
 
@@ -188,13 +186,11 @@ class Screw(object):
         cap = None
         if not no_cap:
             if self.cap_type == CapType.socket:
-                cap = cylinder(
-                    d=self.cap_diameter + cap_clearance, h=cap_depth + tol
-                ).mz()
+                cap = cylinder(d=self.cap_diameter + cap_clearance, h=cap_depth + tol).mz()
             elif self.cap_type == CapType.flat:
                 cap = cylinder(
                     d1=self.diameter + clearance,
-                    d2=self.cap_diameter,
+                    d2=self.cap_diameter + cap_clearance,
                     h=self.cap_depth + tol,
                 ).mz()
                 if inf_cap:
@@ -206,13 +202,7 @@ class Screw(object):
                 cutter = (
                     cube(
                         self.cap_diameter + cap_clearance + tol * 2,
-                        (
-                            self.cap_diameter
-                            + cap_clearance
-                            - (self.diameter + clearance)
-                        )
-                        / 2
-                        + tol,
+                        (self.cap_diameter + cap_clearance - (self.diameter + clearance)) / 2 + tol,
                         layer_height * 2 * 2 + tol,
                     )
                     .t(
@@ -234,22 +224,16 @@ class Screw(object):
 
             if screwdriver is not None:
                 screwdriver_length, screwdriver_diameter = screwdriver
-                cap += cylinder(d=screwdriver_diameter, h=inf).tz(
-                    -context.body.h - screwdriver_length
-                )
+                cap += cylinder(d=screwdriver_diameter, h=inf).tz(-context.body.h - screwdriver_length)
 
         result = body
         if cap is not None:
             result += cap
 
         if nut:
-            nut_model = cylinder(
-                d=self.nut.external_diameter + nut_clearance, h=inf, fn=6
-            ).tz(length - self.nut.height)
+            nut_model = cylinder(d=self.nut.external_diameter + nut_clearance, h=inf, fn=6).tz(length - self.nut.height)
             if nut_cone:
-                nut_model += cylinder(d=self.diameter + clearance, h=tol).tz(
-                    length - self.nut.height - self.diameter
-                )
+                nut_model += cylinder(d=self.diameter + clearance, h=tol).tz(length - self.nut.height - self.diameter)
                 nut_model = nut_model.hull()
             result += nut_model
 

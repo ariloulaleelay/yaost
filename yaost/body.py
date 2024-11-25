@@ -1,3 +1,4 @@
+from math import pi, tan
 from typing import Optional
 
 from lazy import lazy
@@ -8,15 +9,16 @@ from yaost.util import full_arguments_line
 from yaost.vector import Vector
 
 __all__ = [
+    'circle',
     'cube',
     'cylinder',
-    'sphere',
     'polygon',
     'polyhedron',
-    'stl_model',
-    'text_model',
-    'circle',
+    'sphere',
     'square',
+    'stl_model',
+    'surface',
+    'text_model',
 ]
 
 
@@ -249,6 +251,7 @@ def cube(
 
 def cylinder(
     h: float = 0,
+    h_angle: float = 0,
     d: Optional[float] = None,
     r: Optional[float] = None,
     d1: Optional[float] = None,
@@ -256,11 +259,17 @@ def cylinder(
     r1: Optional[float] = None,
     r2: Optional[float] = None,
     fn: Optional[float] = None,
-    chamfer_top: Optional[float] = 0,
-    chamfer_bottom: Optional[float] = 0,
+    chamfer_top: float = 0,
+    chamfer_bottom: float = 0,
     label: Optional[str] = None,
 ) -> BaseBody:
     from yaost.transformation import Hull
+
+    if not h and h_angle and ((d1 and d2) or (r1 and r2)):
+        if d1 and d2:
+            h = abs(d2 - d1) / 2 * tan(h_angle * pi / 180)
+        elif r1 and r2:
+            h = abs(r1 - r2) / 2 * tan(h_angle * pi / 180)
 
     simple_cylinder = Cylinder(
         h=h,
@@ -276,30 +285,54 @@ def cylinder(
     if not chamfer_top and not chamfer_bottom:
         return simple_cylinder
 
+    bottom_cap = Cylinder(d=simple_cylinder.d1, h=min(0.0001, h / 2), fn=fn)
+    top_cap = Cylinder(d=simple_cylinder.d2, h=min(0.0001, h / 2), fn=fn).tz(h - min(0.0001, h / 2))
+
     result = simple_cylinder
     if chamfer_bottom:
         bottom = Cylinder(
             d1=simple_cylinder.d1 - chamfer_bottom * 2,
             d2=simple_cylinder.d1,
-            h=chamfer_bottom,
+            h=abs(chamfer_bottom),
+            fn=fn,
         )
     else:
-        bottom = Cylinder(d=simple_cylinder.d1, h=0.0001)
+        bottom = bottom_cap
 
     if chamfer_top:
         top = Cylinder(
             d1=simple_cylinder.d2,
             d2=simple_cylinder.d2 - chamfer_top * 2,
-            h=chamfer_top,
-        ).tz(h - chamfer_top)
+            h=abs(chamfer_top),
+            fn=fn,
+        ).tz(h - abs(chamfer_top))
     else:
-        top = Cylinder(d=simple_cylinder.d1, h=0.0001).tz(h - 0.0001)
+        top = top_cap
 
-    result = Hull([top, bottom])
+    if chamfer_top >= 0 and chamfer_bottom >= 0:
+        result = Hull([top, bottom], label=label)
+    elif chamfer_top < 0 and chamfer_bottom >= 0:
+        result = Hull([top_cap, bottom], label=label)
+        result += top
+
+    elif chamfer_top >= 0 and chamfer_bottom < 0:
+        result = Hull([top, bottom_cap], label=label)
+        result += bottom
+    elif chamfer_top < 0 and chamfer_bottom < 0:
+        result = Hull([top_cap, bottom_cap], label=label)
+        result += bottom
+        result += top
+    else:
+        raise Exception('Unhandled chamfers combination, this should not happen')
 
     result.origin = simple_cylinder.origin
     result.bbox = simple_cylinder.bbox
     result.is_body = True
+    result.r = simple_cylinder.r
+    result.R = simple_cylinder.R
+    result.d = simple_cylinder.d
+    result.D = simple_cylinder.D
+    result.h = simple_cylinder.h
     return result
 
 
@@ -406,8 +439,16 @@ def square(*args, **kwargs):
 #     return polyhedron(points, [reversed(f) for f in faces], convexity=2)
 
 
-def stl_model(filename, convexity=10):
-    return GenericBody('import', filename, convexity=convexity)
+def stl_model(file=None, convexity=10, **kwargs):
+    kwargs = dict(kwargs)
+    kwargs['file'] = file
+    return GenericBody('import', convexity=convexity, **kwargs)
+
+
+def surface(file=None, convexity=10, **kwargs):
+    kwargs = dict(kwargs)
+    kwargs['file'] = file
+    return GenericBody('surface', convexity=convexity, **kwargs)
 
 
 def text_model(txt, size=10, halign='left', valign='baseline', **kwargs):
