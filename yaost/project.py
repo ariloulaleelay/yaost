@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import fnmatch
 import functools
 import hashlib
@@ -123,8 +124,19 @@ class Project:
     def build(self, args, stl_only=False):
         self.build_scad(args)
         cache = self._read_cache(args.cache_file)
+        now_ts = datetime.datetime.now().strftime('%Y%d%m%H%M%S')
         if 'scad_cache' not in cache:
             cache['scad_cache'] = {}
+        if 'projects' not in cache:
+            cache['projects'] = {}
+
+        if self.name not in cache['projects']:
+            cache['projects'][self.name] = {}
+
+        if 'version' not in cache['projects'][self.name]:
+            cache['projects'][self.name]['version'] = 0
+
+        version = cache['projects'][self.name]['version']
 
         if not os.path.exists(args.build_directory):
             os.makedirs(args.build_directory)
@@ -147,20 +159,41 @@ class Project:
 
             result_file_path = os.path.join(target_directory, name + extension)
 
+            cache_record = cache['scad_cache'].get(scad_file_path, {})
+            if not isinstance(cache_record, dict):
+                cache_record = {}
+            scad_hash = self._get_files_hash(scad_file_path)
             if os.path.exists(result_file_path) and not args.force:
-                hc = self._get_files_hash(scad_file_path, result_file_path)
-                if cache['scad_cache'].get(scad_file_path, '') == hc:
-                    continue
+                build_hash = self._get_files_hash(result_file_path)
+            else:
+                build_hash = ''
+
+            if cache_record.get('build_hash', '') == build_hash and cache_record.get('scad_hash', '') == scad_hash:
+                continue
 
             command_args = [
                 'openscad',
                 scad_file_path,
                 '-o',
                 result_file_path,
+                '-D',
+                f'timestamp="{now_ts}"',
+                '-D',
+                f'hash="{scad_hash[:8]}"',
+                '-D',
+                f'version="{version:06d}"',
+                '-D',
+                f'mark="{version}."',
             ]
             subprocess.call(command_args, shell=False)
-            hc = self._get_files_hash(scad_file_path, result_file_path)
-            cache['scad_cache'][scad_file_path] = hc
+
+            build_hash = self._get_files_hash(result_file_path)
+            cache['scad_cache'][scad_file_path] = {
+                'scad_hash': scad_hash,
+                'build_hash': build_hash,
+                'version': version + 1,
+            }
+            cache['projects'][self.name]['version'] = version + 1
             self._write_cache(args.cache_file, cache)
 
     def build_scad(self, args):
@@ -172,6 +205,10 @@ class Project:
                     value = getattr(self, f'_{key}', None)
                     if value is not None:
                         fp.write(f'${key}={value:.6f};\n')
+                fp.write('timestamp="0000-00-00T00:00:00";\n')
+                fp.write('hash="00000000";\n')
+                fp.write('version="000000";\n')
+                fp.write('mark="000.";\n')
                 scad_code = model.to_scad()
                 fp.write(scad_code)
                 fp.write('\n')

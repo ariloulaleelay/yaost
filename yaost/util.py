@@ -1,3 +1,4 @@
+from yaost.variable import Variable
 from yaost.vector import Vector
 
 
@@ -18,6 +19,8 @@ def _serialize_argument(v):
         chunk = '[{}]'.format(','.join(_serialize_argument(vv) for vv in v))
     elif isinstance(v, str):
         chunk = f'"{v}"'
+    elif isinstance(v, Variable):
+        chunk = v.name
     else:
         raise RuntimeError(f'Unknown type of v: {type(v)}')
     return chunk

@@ -33,9 +33,7 @@ class MultipleChildrenTransformation(BaseTransformation):
         elif len(self.children) == 1:
             result = self.children[0].to_scad()
         else:
-            result = '{{{}}}'.format(
-                ''.join([child.to_scad() for child in self.children])
-            )
+            result = '{{{}}}'.format(''.join([child.to_scad() for child in self.children]))
         return result
 
 
@@ -110,9 +108,7 @@ class Rotate(SingleChildTransformation):
         self._vector = vector
 
     def _clone_with_another_child(self, another_child: BaseObject):
-        return self.__class__(
-            self._vector, self._center, another_child, clone=self._clone
-        )
+        return self.__class__(self._vector, self._center, another_child, clone=self._clone)
 
     @lazy
     def origin(self):
@@ -134,7 +130,7 @@ class Rotate(SingleChildTransformation):
 
     @property
     def y(self):
-        return self._vector.x
+        return self._vector.y
 
     @property
     def z(self):
@@ -144,9 +140,7 @@ class Rotate(SingleChildTransformation):
         rotate_str = 'rotate({})'.format(full_arguments_line([self._vector]))
         child_str = self.child.to_scad()
         if self._center:
-            translate1_str = 'translate({})'.format(
-                full_arguments_line([-self._center])
-            )
+            translate1_str = 'translate({})'.format(full_arguments_line([-self._center]))
             translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
             result = f'{translate2_str}{rotate_str}{translate1_str}{child_str}'
         else:
@@ -167,9 +161,7 @@ class Union(MultipleChildrenTransformation):
         self.bbox = BBox()
         self.label = label
         flat_children = self._get_flat_children(children)
-        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(
-            flat_children
-        )
+        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(flat_children)
         self.children = flat_children
 
     @classmethod
@@ -213,9 +205,7 @@ class Hull(MultipleChildrenTransformation):
         self.bbox = BBox()
         self.label = label
         flat_children = self._get_flat_children(children)
-        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(
-            flat_children
-        )
+        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(flat_children)
         self.children = flat_children
 
     @classmethod
@@ -245,9 +235,7 @@ class Intersection(MultipleChildrenTransformation):
         self.label = label
         flat_children = self._get_flat_children(children)
         # TODO calculate origin properly
-        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(
-            flat_children
-        )
+        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(flat_children)
         self.children = children
 
     @classmethod
@@ -319,9 +307,7 @@ class Mirror(SingleChildTransformation):
         self._vector = vector
 
     def _clone_with_another_child(self, another_child: BaseObject):
-        return self.__class__(
-            self._vector, self._center, another_child, clone=self._clone
-        )
+        return self.__class__(self._vector, self._center, another_child, clone=self._clone)
 
     @lazy
     def origin(self):
@@ -355,9 +341,7 @@ class Mirror(SingleChildTransformation):
         mirror_str = 'mirror({})'.format(full_arguments_line([self._vector]))
         child_str = self.child.to_scad()
         if self._center:
-            translate1_str = 'translate({})'.format(
-                full_arguments_line([-self._center])
-            )
+            translate1_str = 'translate({})'.format(full_arguments_line([-self._center]))
             translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
             result = f'{translate2_str}{mirror_str}{translate1_str}{child_str}'
         else:
@@ -383,9 +367,7 @@ class Scale(SingleChildTransformation):
         self._vector = vector
 
     def _clone_with_another_child(self, another_child: BaseObject):
-        return self.__class__(
-            self._vector, self._center, another_child, clone=self._clone
-        )
+        return self.__class__(self._vector, self._center, another_child, clone=self._clone)
 
     @lazy
     def origin(self):
@@ -419,9 +401,7 @@ class Scale(SingleChildTransformation):
         transform_str = 'scale({})'.format(full_arguments_line([self._vector]))
         child_str = self.child.to_scad()
         if self._center:
-            translate1_str = 'translate({})'.format(
-                full_arguments_line([-self._center])
-            )
+            translate1_str = 'translate({})'.format(full_arguments_line([-self._center]))
             translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
             result = f'{translate2_str}{transform_str}{translate1_str}{child_str}'
         else:
