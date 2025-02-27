@@ -224,11 +224,21 @@ def cube(
     if not r:
         return simple_cube
 
+    if chamfer_top < 0:
+        pillar_chamfer_top = 0
+    else:
+        pillar_chamfer_top = chamfer_top
+
+    if chamfer_bottom < 0:
+        pillar_chamfer_bottom = 0
+    else:
+        pillar_chamfer_bottom = chamfer_bottom
+
     pillar = cylinder(
         r=r,
         h=z,
-        chamfer_top=chamfer_top,
-        chamfer_bottom=chamfer_bottom,
+        chamfer_top=pillar_chamfer_top,
+        chamfer_bottom=pillar_chamfer_bottom,
     ).t(r, r)
     result = Hull(
         [
@@ -238,6 +248,44 @@ def cube(
             pillar.t(0, y - 2 * r),
         ]
     )
+
+    if chamfer_top < 0:
+        top_cap = cylinder(
+            d1=r * 2,
+            d2=r * 2 - chamfer_top * 2,
+            h=-chamfer_top,
+        ).t(
+            r,
+            r,
+            z + chamfer_top,
+        )
+        result += Hull(
+            [
+                top_cap,
+                top_cap.t(x - 2 * r),
+                top_cap.t(x - 2 * r, y - 2 * r),
+                top_cap.t(0, y - 2 * r),
+            ]
+        )
+
+    if chamfer_bottom < 0:
+        bottom_cap = cylinder(
+            d1=r * 2 - chamfer_bottom * 2,
+            d2=r * 2,
+            h=-chamfer_bottom,
+        ).t(
+            r,
+            r,
+            0,
+        )
+        result += Hull(
+            [
+                bottom_cap,
+                bottom_cap.t(x - 2 * r),
+                bottom_cap.t(x - 2 * r, y - 2 * r),
+                bottom_cap.t(0, y - 2 * r),
+            ]
+        )
 
     result.origin = simple_cube.origin
     result.bbox = simple_cube.bbox
