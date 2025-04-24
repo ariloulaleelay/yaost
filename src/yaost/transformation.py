@@ -12,6 +12,7 @@ __all__ = [
     'difference',
     'hull',
     'intersection',
+    'join',
     'minkowski',
     'union',
 ]
@@ -25,16 +26,65 @@ class SingleChildTransformation(BaseTransformation):
     def _clone_with_another_child(self, another_child: BaseObject):
         raise NotImplementedError
 
+    def solids(self):
+        for solid in self.child.solids():
+            yield self._clone_with_another_child(solid)
+
+    def holes(self):
+        for hole in self.child.holes():
+            yield self._clone_with_another_child(hole)
+
+    def collapse(self, *classes_to_collapse):
+        for collapsed in self.child.collapse(*classes_to_collapse):
+            yield self._clone_with_another_child(collapsed)
+
 
 class MultipleChildrenTransformation(BaseTransformation):
+    __can_order_children__ = True
+    __first_child_fixed__ = False
+    __deduplicate__ = True
+
+    @classmethod
+    def _maybe_list_to_scad(cls, nodes):
+        nodes = list(nodes)
+
+        chunks = [node.to_scad() for node in nodes]
+        if cls.__can_order_children__:
+            if cls.__first_child_fixed__:
+                chunks = chunks[:1] + list(sorted(chunks[1:]))
+            else:
+                chunks.sort()
+
+        if cls.__deduplicate__:
+            tmp, chunks = chunks, []
+            if cls.__first_child_fixed__:
+                chunks.append(tmp[0])
+                tmp = tmp[1:]
+
+            seen = set()
+            for chunk in tmp:
+                if chunk in seen:
+                    continue
+                seen.add(chunk)
+                chunks.append(chunk)
+
+        if not chunks:
+            return ''
+
+        if len(chunks) == 1:
+            return chunks[0]
+
+        return '{{{}}}'.format(''.join(chunks))
+
     def _children_to_scad(self):
-        if not self.children:
-            result = ''
-        elif len(self.children) == 1:
-            result = self.children[0].to_scad()
+        return self._maybe_list_to_scad(self.children)
+
+    def collapse(self, *classes_to_collapse):
+        if isinstance(self, classes_to_collapse):
+            for child in self.children:
+                yield from child.collapse(*classes_to_collapse)
         else:
-            result = '{{{}}}'.format(''.join([child.to_scad() for child in self.children]))
-        return result
+            yield self
 
 
 class Translate(SingleChildTransformation):
@@ -52,6 +102,16 @@ class Translate(SingleChildTransformation):
 
     def _clone_with_another_child(self, another_child: BaseObject):
         return self.__class__(self._vector, another_child, clone=self._clone)
+
+    def collapse(self, *classes_to_collapse):
+        for collapsed in self.child.collapse(*classes_to_collapse):
+            if isinstance(collapsed, Translate) and self._clone == collapsed._clone:
+                yield self.__class__(
+                    self._vector + collapsed._vector,
+                    collapsed.child,
+                )
+            else:
+                yield self._clone_with_another_child(collapsed)
 
     @lazy
     def origin(self):
@@ -80,9 +140,7 @@ class Translate(SingleChildTransformation):
 
     def to_scad(self):
         child_str = self.child.to_scad()
-        translate_str = 'translate({})'.format(
-            full_arguments_line([self._vector]),
-        )
+        translate_str = f'translate({full_arguments_line([self._vector])})'
         result = f'{translate_str}{child_str}'
         if self._clone:
             result = f'union(){{{child_str}{result}}}'
@@ -137,11 +195,11 @@ class Rotate(SingleChildTransformation):
         return self._vector.z
 
     def to_scad(self):
-        rotate_str = 'rotate({})'.format(full_arguments_line([self._vector]))
+        rotate_str = f'rotate({full_arguments_line([self._vector])})'
         child_str = self.child.to_scad()
         if self._center:
-            translate1_str = 'translate({})'.format(full_arguments_line([-self._center]))
-            translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
+            translate1_str = f'translate({full_arguments_line([-self._center])})'
+            translate2_str = f'translate({full_arguments_line([self._center])})'
             result = f'{translate2_str}{rotate_str}{translate1_str}{child_str}'
         else:
             result = f'{rotate_str}{child_str}'
@@ -156,27 +214,24 @@ class Union(MultipleChildrenTransformation):
         children: Iterable[BaseObject],
         label: Optional[str] = None,
     ):
-        children = list(children)
+        self.children = list(children)
+
+        flat_children = list(self.collapse(Union, Hull))
+        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(flat_children)
         # TODO calculate bbox properly
         self.bbox = BBox()
         self.label = label
-        flat_children = self._get_flat_children(children)
-        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(flat_children)
-        self.children = flat_children
-
-    @classmethod
-    def _get_flat_children(cls, children):
-        result = []
-        for child in children:
-            if isinstance(child, Union) and child.label is None:
-                for subchild in cls._get_flat_children(child.children):
-                    result.append(subchild)
-            else:
-                result.append(child)
-        return sorted(result, key=lambda x: x.to_scad())
 
     def to_scad(self):
-        return 'union(){}'.format(self._children_to_scad())
+        children = list(self.collapse(Union))
+
+        if len(children) == 0:
+            return ''
+
+        if len(children) == 1:
+            return children[0].to_scad()
+
+        return f'union(){self._maybe_list_to_scad(children)}'
 
 
 class Minkowski(MultipleChildrenTransformation):
@@ -191,7 +246,7 @@ class Minkowski(MultipleChildrenTransformation):
         self.children = children
 
     def to_scad(self):
-        return 'minkowski(){}'.format(self._children_to_scad())
+        return f'minkowski(){self._children_to_scad()}'
 
 
 class Hull(MultipleChildrenTransformation):
@@ -200,27 +255,16 @@ class Hull(MultipleChildrenTransformation):
         children: Iterable[BaseObject],
         label: Optional[str] = None,
     ):
-        children = list(children)
+        self.children = list(children)
+        flat_children = list(self.collapse(Union, Hull))
+        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(flat_children)
         # TODO calculate bbox properly
         self.bbox = BBox()
         self.label = label
-        flat_children = self._get_flat_children(children)
-        self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(flat_children)
-        self.children = flat_children
-
-    @classmethod
-    def _get_flat_children(cls, children):
-        result = []
-        for child in children:
-            if isinstance(child, (Union, Hull)) and child.label is None:
-                for subchild in cls._get_flat_children(child.children):
-                    result.append(subchild)
-            else:
-                result.append(child)
-        return sorted(result, key=lambda x: x.to_scad())
 
     def to_scad(self):
-        return 'hull(){}'.format(self._children_to_scad())
+        children = self.collapse(Union, Hull)
+        return f'hull(){self._maybe_list_to_scad(children)}'
 
 
 class Intersection(MultipleChildrenTransformation):
@@ -229,65 +273,128 @@ class Intersection(MultipleChildrenTransformation):
         children: Iterable[BaseObject],
         label: Optional[str] = None,
     ):
-        children = list(children)
+        self.children = list(children)
+        flat_children = list(self.collapse(Intersection))
         # TODO calculate bbox properly
         self.bbox = BBox()
         self.label = label
-        flat_children = self._get_flat_children(children)
         # TODO calculate origin properly
         self.origin = reduce(lambda x, y: x + y.origin, flat_children, Vector()) / len(flat_children)
-        self.children = children
-
-    @classmethod
-    def _get_flat_children(cls, children):
-        result = []
-        for child in children:
-            if isinstance(child, Intersection) and child.label is None:
-                for subchild in cls._get_flat_children(child.children):
-                    result.append(subchild)
-            else:
-                result.append(child)
-        return sorted(result, key=lambda x: x.to_scad())
 
     def to_scad(self):
-        return 'intersection(){}'.format(self._children_to_scad())
+        children = self.collapse(Intersection)
+        return f'intersection(){self._maybe_list_to_scad(children)}'
 
 
 class Difference(MultipleChildrenTransformation):
+    __first_child_fixed__ = True
+
     def __init__(
         self,
         children: Iterable[BaseObject],
         label: Optional[str] = None,
     ):
-        children = list(children)
-        assert len(children) >= 2
-        # TODO calculate bbox properly
-        self.bbox = children[0].bbox
-        self.label = label
-        first = children[0]
-        flat_children = self._get_flat_children(children[1:])
+        self.children = list(children)
+        assert len(self.children) > 1
 
         # TODO calculate origin properly
-        self.origin = first.origin
-        if len(flat_children) > 1:
-            second = Union(flat_children)
-        else:
-            second = flat_children[0]
-        self.children = [first, second]
+        self.origin = children[0].origin
+        self.bbox = children[0].bbox
+        self.label = label
 
-    @classmethod
-    def _get_flat_children(cls, children):
-        result = []
-        for child in children:
-            if isinstance(child, Union) and child.label is None:
-                for subchild in cls._get_flat_children(child.children):
-                    result.append(subchild)
-            else:
-                result.append(child)
-        return sorted(result, key=lambda x: x.to_scad())
+    def solids(self):
+        for solid in self.children[0].solids():
+            yield from solid.collapse(Union)
+
+    def holes(self):
+        for hole in self.children[0].holes():
+            yield from hole.collapse(Union)
+        for hole in self.children[1:]:
+            yield from hole.collapse(Union)
+
+    def collapse(self, *classes_to_collapse):
+        if isinstance(self, classes_to_collapse):
+            holes = []
+            for child in self.children[1:]:
+                holes.extend(child.collapse(Union))
+
+            true_solids = []
+            dirty_solids = self.children[0].collapse(Union)
+            for solid in dirty_solids:
+                ss = list(solid.collapse(Difference))
+                true_solids.append(ss[0])
+                holes.extend(ss[1:])
+
+            if len(true_solids) > 1:
+                true_solids = [Union(true_solids)]
+
+            yield from true_solids
+            yield from holes
+
+        else:
+            yield self
 
     def to_scad(self):
-        return 'difference(){}'.format(self._children_to_scad())
+        children = self.collapse(Difference)
+        return f'difference(){self._maybe_list_to_scad(children)}'
+
+
+class Join(MultipleChildrenTransformation):
+    __first_child_fixed__ = True
+
+    def __init__(
+        self,
+        children: Iterable[BaseObject],
+        label: Optional[str] = None,
+    ):
+        self.children = list(children)
+        assert len(self.children) > 1
+
+        # TODO calculate origin properly
+        self.origin = self.children[0].origin
+        self.bbox = self.children[0].bbox
+        self.label = label
+
+    def collapse(self, *classes_to_collapse):
+        if isinstance(self, classes_to_collapse):
+            holes = []
+            solids = []
+
+            solids.extend(self.children[0].collapse(Union))
+
+            for child in self.children[1:]:
+                for subchild in child.collapse(Union):
+                    chunks = list(subchild.collapse(Difference))
+                    if not chunks:
+                        continue
+                    solids.extend(chunks[:1])
+                    holes.extend(chunks[1:])
+
+            if len(solids) > 1:
+                solids = [Union(solids)]
+
+            yield from solids
+            yield from holes
+
+        else:
+            yield self
+
+    def to_scad(self):
+        chunks = list(self.collapse(Join))
+        solids = chunks[:1]
+        holes = chunks[1:]
+        print('HOLES', holes)
+        print('SOLIDS', solids)
+
+        if not solids:
+            return ''
+
+        if not holes:
+            return solids[0].to_scad()
+
+        children = solids + holes
+
+        return f'difference(){self._maybe_list_to_scad(children)}'
 
 
 class Mirror(SingleChildTransformation):
@@ -338,11 +445,11 @@ class Mirror(SingleChildTransformation):
         return self._vector.z
 
     def to_scad(self):
-        mirror_str = 'mirror({})'.format(full_arguments_line([self._vector]))
+        mirror_str = f'mirror({full_arguments_line([self._vector])})'
         child_str = self.child.to_scad()
         if self._center:
-            translate1_str = 'translate({})'.format(full_arguments_line([-self._center]))
-            translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
+            translate1_str = f'translate({full_arguments_line([-self._center])})'
+            translate2_str = f'translate({full_arguments_line([self._center])})'
             result = f'{translate2_str}{mirror_str}{translate1_str}{child_str}'
         else:
             result = f'{mirror_str}{child_str}'
@@ -398,11 +505,11 @@ class Scale(SingleChildTransformation):
         return self._vector.z
 
     def to_scad(self):
-        transform_str = 'scale({})'.format(full_arguments_line([self._vector]))
+        transform_str = f'scale({full_arguments_line([self._vector])})'
         child_str = self.child.to_scad()
         if self._center:
-            translate1_str = 'translate({})'.format(full_arguments_line([-self._center]))
-            translate2_str = 'translate({})'.format(full_arguments_line([self._center]))
+            translate1_str = f'translate({full_arguments_line([-self._center])})'
+            translate2_str = f'translate({full_arguments_line([self._center])})'
             result = f'{translate2_str}{transform_str}{translate1_str}{child_str}'
         else:
             result = f'{transform_str}{child_str}'
@@ -435,6 +542,16 @@ class LinearExtrude(SingleChildTransformation):
         self._twist = twist
         self._slices = slices
         self._fn = fn
+
+    def _clone_with_another_child(self, another_child: BaseObject):
+        return self.__class__(
+            self._height,
+            self.child,
+            self._convexity,
+            self._twist,
+            self._slices,
+            self._fn,
+        )
 
     def to_scad(self):
         return 'linear_extrude({}){}'.format(
@@ -474,16 +591,12 @@ class RotateExtrude(SingleChildTransformation):
         self._fn = fn
 
     def to_scad(self):
-        args = ','.join(
-            f'{k}={v:.6f}'
-            for k, v in (
-                ('angle', self._angle),
-                ('convexity', self._convexity),
-                ('$fn', self._fn),
-            )
-            if v is not None
+        args = full_arguments_line(
+            angle=self._angle,
+            convexity=self._convexity,
+            fn=self._fn,
         )
-        return 'rotate_extrude({}){}'.format(args, self.child.to_scad())
+        return f'rotate_extrude({args}){self.child.to_scad()}'
 
 
 class GenericSingleTransformation(SingleChildTransformation):
@@ -548,7 +661,7 @@ class Modifier(SingleChildTransformation):
         return self.__class__(self._name, self.child)
 
     def to_scad(self):
-        return '{}{}'.format(self._name, self.child.to_scad())
+        return f'{self._name}{self.child.to_scad()}'
 
 
 def difference(*args, label: Optional[str] = None):
@@ -569,3 +682,7 @@ def minkowski(*args, label: Optional[str] = None):
 
 def union(*args, label: Optional[str] = None):
     return Union(args, label=label)
+
+
+def join(*args, label: Optional[str] = None):
+    return Join(args, label=label)

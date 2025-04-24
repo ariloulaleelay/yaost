@@ -23,9 +23,9 @@ def test_projection():
         pl = Vector(10, -10).rz(i * 0.1)
         pr = Vector(10, 10).rz(i * 0.1)
 
-        for l, r in ((pl, pr), (pr, pl)):
-            projection = v.projection(l, r)
+        for ll, r in ((pl, pr), (pr, pl)):
+            projection = v.projection(ll, r)
 
-            assert (l - projection).norm <= (l - v).norm
+            assert (ll - projection).norm <= (ll - v).norm
             assert (r - projection).norm <= (r - v).norm
-            assert abs((v - projection).dot(l - r)) < 10e-6
+            assert abs((v - projection).dot(ll - r)) < 10e-6

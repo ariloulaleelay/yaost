@@ -57,6 +57,16 @@ class BaseObject:
             return result
         return result + [self]
 
+    def solids(self):
+        yield self
+
+    def holes(self):
+        return
+        yield self
+
+    def collapse(self, *classes_to_collapse):
+        yield self
+
     def same_moves(
         self,
         obj_or_label: 'BaseObject',
@@ -94,7 +104,7 @@ class BaseObject:
         return value
 
     def group(self, label: Optional[str] = None) -> 'BaseObject':
-        '''Group elements. Interpret as single body.'''
+        """Group elements. Interpret as single body."""
         from yaost.body import Group
 
         return Group(self, label=label)
@@ -379,6 +389,11 @@ class BaseObject:
 
     def __mul__(self, other):
         return self.intersection(other)
+
+    def join(self, other: 'BaseObject', label: Optional[str] = None):
+        from yaost.transformation import Join
+
+        return Join([self, other], label=label)
 
     def union(self, other: 'BaseObject', label: Optional[str] = None):
         from yaost.transformation import Union

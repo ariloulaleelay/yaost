@@ -1,9 +1,12 @@
 # import pytest
 
-from yaost.body import Cylinder, Cube
+from yaost import join
+from yaost.body import Cube, Cylinder
+
+from .common import Node
 
 
-def test_translate():
+def test_simple_cube():
     cube = Cube(1, 1, 1)
     assert 'cube([1,1,1]);' == cube.to_scad()
 
@@ -30,44 +33,65 @@ def test_cylinder():
     assert 'cylinder(h=3,r1=1,r2=2);' == cylinder.to_scad()
 
     cylinder = Cylinder(r1=1, r2=2, h=3).t(1)
-    assert (
-        'translate([1,0,0])cylinder(h=3,r1=1,r2=2);'
-        ==
-        cylinder.to_scad()
-    )
+    assert 'translate([1,0,0])cylinder(h=3,r1=1,r2=2);' == cylinder.to_scad()
 
-# def test_serialization():
-#     n = Node('x', None, int_value=1)
-#     assert 'x(int_value=1);' == n.to_string()
-#
-#     n = Node('x', None, bool_value=True)
-#     assert 'x(bool_value=true);' == n.to_string()
-#
-#     n = Node('x', None, str_value='abc')
-#     assert 'x(str_value="abc");' == n.to_string()
-#
-#     n = Node('x', None, float_value=0.00001)
-#     assert 'x(float_value=0.000010);' == n.to_string()
-#
-#     n = Node('x', None, array_value=[1, 2, 3, 'x'])
-#     assert 'x(array_value=[1,2,3,"x"]);' == n.to_string()
-#
-#     n = Node('x', None, fn=1)
-#     assert 'x($fn=1);' == n.to_string()
-#
-#     n = Node('x', None, 1, 2, 3, 4)
-#     assert 'x(1,2,3,4);' == n.to_string()
-#
-#     n = Node('x', None, 1, a=2)
-#     assert 'x(1,a=2);' == n.to_string()
-#
-#
-# def test_union_collapse():
-#     x = Node('x', None)
-#     y = Node('y', None)
-#     z = Node('z', None)
-#
-#     xy = x + y
-#     xyz = xy + z
-#     assert 'union(){x();y();}' == xy.to_string()
-#     assert 'union(){x();y();z();}' == xyz.to_string()
+
+def test_tree_union_collapses_to_flat_union():
+    x = Node('x')
+    y = Node('y')
+
+    z = Node('z')
+    a = Node('a')
+
+    xy = x + y
+    za = z + a
+    xyza = xy + za
+    assert 'union(){x();y();}' == xy.to_scad()
+    assert 'union(){a();z();}' == za.to_scad()
+    assert 'union(){a();x();y();z();}' == xyza.to_scad()
+
+
+def test_union_removes_duplicates():
+    x = Node('x')
+    y = Node('y')
+    z = Node('z')
+
+    xy = x + y
+    yz = y + z
+    xyz = xy + yz
+    assert 'union(){x();y();z();}' == xyz.to_scad()
+
+
+def test_difference_collapses_unions():
+    x = Node('x')
+    y = Node('y')
+    a = Node('a')
+
+    x_plus_y = x + y
+    a_minus_xy = a - x_plus_y
+
+    assert 'difference(){a();x();y();}' == a_minus_xy.to_scad()
+
+
+def test_simple_join_produces_difference():
+    x = Node('x')
+    y = Node('y')
+    z = Node('z')
+    a = Node('a')
+
+    x_plus_y = x + y
+    z_minus_a = z - a
+    result = join(x_plus_y, z_minus_a)
+    assert 'difference(){union(){x();y();z();}a();}' == result.to_scad()
+
+    result = join(z_minus_a, x_plus_y)
+    assert 'union(){difference(){z();a();}x();y();}' == result.to_scad()
+
+
+def test_same_nodes_in_union_deduplicated():
+    x = Node('x')
+    y = Node('y')
+    z = Node('z')
+
+    result = x + y + z + z + y + x
+    assert 'union(){x();y();z();}' == result.to_scad()
