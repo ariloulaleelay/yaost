@@ -1,14 +1,16 @@
+from typing import Any
+
 from yaost.variable import Variable
 from yaost.vector import Vector
 
 
-def nice_float(v: float):
+def nice_float(v: float) -> str:
     result = f'{v:.6f}'
     result = result.rstrip('0').rstrip('.')
     return result
 
 
-def _serialize_argument(v):
+def _serialize_argument(v: Any) -> str:
     if isinstance(v, bool):
         chunk = 'true' if v else 'false'
     elif isinstance(v, (int, float)):
@@ -26,7 +28,7 @@ def _serialize_argument(v):
     return chunk
 
 
-def full_arguments_line(args=(), kwargs=()):
+def full_arguments_line(args=(), kwargs=()) -> str:
     chunks = []
     for arg in args:
         chunk = _serialize_argument(arg)

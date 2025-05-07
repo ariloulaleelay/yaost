@@ -11,12 +11,27 @@ import subprocess
 import sys
 import time
 import uuid
+from typing import List
 
 from .base import BaseObject
 from .local_logging import get_logger
 from .module_watcher import ModuleWatcher
 
 logger = get_logger(__name__)
+
+
+def alphabet_encode(number: int, alphabet='0123456789ABCDEFGHJKLMNPRSTUVWXYZ', padding: int = 0) -> str:
+    """Converts an integer to a base|alphabet_length| string."""
+    if not isinstance(number, int):
+        raise TypeError('number must be an integer')
+
+    number = abs(number)
+
+    chunks: List[str] = []
+    while number or len(chunks) < padding:
+        chunks.append(alphabet[number % len(alphabet)])
+        number = number // len(alphabet)
+    return ''.join(reversed(chunks))
 
 
 class Project:
@@ -184,6 +199,8 @@ class Project:
                 f'version="{version:06d}"',
                 '-D',
                 f'mark="{version}."',
+                '-D',
+                f'cmark="{alphabet_encode(version, padding=2)}"',
             ]
             subprocess.call(command_args, shell=False)
 
@@ -209,6 +226,7 @@ class Project:
                 fp.write('hash="00000000";\n')
                 fp.write('version="000000";\n')
                 fp.write('mark="000.";\n')
+                fp.write('cmark="00";\n')
                 scad_code = model.to_scad()
                 fp.write(scad_code)
                 fp.write('\n')
@@ -255,7 +273,7 @@ class Project:
         if not os.path.exists(cache_file):
             return {}
         try:
-            with open(cache_file, 'r') as fp:
+            with open(cache_file) as fp:
                 result = json.load(fp)
         except:  # noqa
             logger.error('reading cache failed', exc_info=True)

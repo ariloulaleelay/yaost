@@ -383,8 +383,6 @@ class Join(MultipleChildrenTransformation):
         chunks = list(self.collapse(Join))
         solids = chunks[:1]
         holes = chunks[1:]
-        print('HOLES', holes)
-        print('SOLIDS', solids)
 
         if not solids:
             return ''
