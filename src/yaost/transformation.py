@@ -588,11 +588,22 @@ class RotateExtrude(SingleChildTransformation):
         self._convexity = convexity
         self._fn = fn
 
-    def to_scad(self):
-        args = full_arguments_line(
+    def _clone_with_another_child(self, another_child: BaseObject):
+        return self.__class__(
+            self.child,
             angle=self._angle,
             convexity=self._convexity,
             fn=self._fn,
+        )
+
+    def to_scad(self):
+        args = full_arguments_line(
+            args=(),
+            kwargs=dict(
+                angle=self._angle,
+                convexity=self._convexity,
+                fn=self._fn,
+            ),
         )
         return f'rotate_extrude({args}){self.child.to_scad()}'
 
