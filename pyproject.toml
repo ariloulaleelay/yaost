@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yaost"
-version = "2.2.1"
+version = "2.2.2"
 dependencies = [
     "lazy>=1.4", 
     "pyinotify-elephant-fork>=0.0.1", 
