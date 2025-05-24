@@ -314,22 +314,10 @@ class Difference(MultipleChildrenTransformation):
 
     def collapse(self, *classes_to_collapse):
         if isinstance(self, classes_to_collapse):
-            holes = []
+            yield self.children[0]
+
             for child in self.children[1:]:
-                holes.extend(child.collapse(Union))
-
-            true_solids = []
-            dirty_solids = self.children[0].collapse(Union)
-            for solid in dirty_solids:
-                ss = list(solid.collapse(Difference))
-                true_solids.append(ss[0])
-                holes.extend(ss[1:])
-
-            if len(true_solids) > 1:
-                true_solids = [Union(true_solids)]
-
-            yield from true_solids
-            yield from holes
+                yield from child.collapse(Union)
 
         else:
             yield self

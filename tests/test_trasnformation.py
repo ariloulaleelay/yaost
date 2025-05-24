@@ -95,3 +95,22 @@ def test_same_nodes_in_union_deduplicated():
 
     result = x + y + z + z + y + x
     assert 'union(){x();y();z();}' == result.to_scad()
+
+
+def test_union_does_not_apply_join_algorightm():
+    x = Node('x')
+    y = Node('y')
+    z = Node('z')
+
+    result = x + (y - z)
+    assert 'union(){difference(){y();z();}x();}' == result.to_scad()
+
+
+def test_complex_optimization_case():
+    x = Node('x')
+    y = Node('y')
+    z = Node('z')
+    a = Node('a')
+
+    result = (x + (y - z)) - a
+    assert 'difference(){union(){difference(){y();z();}x();}a();}' == result.to_scad()
